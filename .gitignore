@@ -9,8 +9,10 @@ docs/canvas-token-details.png
 data/raw/
 
 # Gegenereerd uit je eigen account: bevat je opdrachtnamen en omschrijvingen.
-docs/portfolio-dossier.md
-data/portfolio_assignments.json
+# Let op: het patroon eindigt op /docs/... en niet op de map zelf, zodat er
+# later wél iets anders in die mappen getrackt kan worden.
+/docs/portfolio-dossier.md
+/data/portfolio_assignments.json
 
 # Lokale toestand van het dashboard.
 dashboard/state.json
