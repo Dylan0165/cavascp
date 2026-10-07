@@ -1,0 +1,38 @@
+# Credentials en ruwe API-data horen niet in versiebeheer.
+.env
+.env.*
+
+# Je echte naam staat in de schermafbeelding van de Canvas-tokenpagina.
+docs/canvas-token-details.png
+
+# Ruwe Canvas-antwoorden kunnen persoonlijke gegevens bevatten.
+data/raw/
+
+# Gegenereerd uit je eigen account: bevat je opdrachtnamen en omschrijvingen.
+docs/portfolio-dossier.md
+data/portfolio_assignments.json
+
+# Lokale toestand van het dashboard.
+dashboard/state.json
+dashboard/documents.json
+
+# Schermafbeeldingen van je eigen portfolio: alleen voor lokaal gebruik.
+dashboard/preview/
+
+# Het browserprofiel bevat je ingelogde Fontys-sessie: net zo gevoelig als een
+# wachtwoord. Nooit in versiebeheer.
+browser/.chrome-profile/
+browser/out/
+
+# Node
+node_modules/
+npm-debug.log*
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+
+# Tijdelijk
+*.tmp
+*.log

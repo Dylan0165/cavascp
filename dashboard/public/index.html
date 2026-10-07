@@ -1,0 +1,181 @@
+<!doctype html>
+<html lang="nl" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>cavascp — portfolio</title>
+<meta name="color-scheme" content="dark light">
+<link rel="stylesheet" href="/styles.css">
+<meta name="referrer" content="no-referrer">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='24' fill='%23e2a63f'/><rect x='26' y='30' width='48' height='6' rx='3' fill='%231a1408'/><rect x='26' y='47' width='34' height='6' rx='3' fill='%231a1408'/><rect x='26' y='64' width='42' height='6' rx='3' fill='%231a1408'/></svg>">
+<script>
+  /*
+   * Sessiesleutel beschikbaar maken voor de downloads.
+   *
+   * De cookie zelf is HttpOnly, dus JavaScript kan er niet bij — dat is de
+   * bedoeling. Maar een <a download> kan geen header meesturen, dus daar is de
+   * sleutel als queryparameter nodig. De server zet Referrer-Policy op
+   * no-referrer, zodat die sleutel nergens via een Referer weglekt.
+   */
+  window.__CAVASCP_KEY__ = new URLSearchParams(location.search).get('k') || '';
+</script>
+</head>
+<body>
+
+<a class="skip" href="#main">Naar de inhoud</a>
+
+<!-- Gelaagde achtergrond: het glas heeft iets te breken nodig. -->
+<div class="bg" aria-hidden="true">
+  <span class="bg__blob bg__blob--a"></span>
+  <span class="bg__blob bg__blob--b"></span>
+  <span class="bg__blob bg__blob--c"></span>
+</div>
+
+<header class="topbar">
+  <div class="topbar__left">
+    <span class="mark" aria-hidden="true"></span>
+    <div class="topbar__id">
+      <strong>cavascp</strong>
+      <span id="whoami" class="muted">laden…</span>
+    </div>
+  </div>
+  <div class="topbar__right">
+    <span id="stamp" class="stamp" title="Laatste keer opgehaald">—</span>
+    <button id="refresh" class="btn btn--ghost" type="button" title="Opnieuw ophalen bij Canvas">
+      <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M13.5 8a5.5 5.5 0 1 1-1.6-3.9" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><path d="M13.6 1.9v3.2h-3.2" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      Verversen
+    </button>
+    <button id="theme" class="btn btn--icon" type="button" title="Wissel licht/donker" aria-label="Wissel licht/donker thema">
+      <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 1.6v1.8M8 12.6v1.8M1.6 8h1.8M12.6 8h1.8M3.5 3.5l1.3 1.3M11.2 11.2l1.3 1.3M12.5 3.5l-1.3 1.3M4.8 11.2l-1.3 1.3" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/><circle cx="8" cy="8" r="3" fill="none" stroke="currentColor" stroke-width="1.4"/></svg>
+    </button>
+  </div>
+</header>
+
+<main id="main">
+
+  <section class="masthead">
+    <div class="masthead__text">
+      <p class="eyebrow">Fontys ICT · Canvas · alleen-lezen</p>
+      <h1>Portfolio<span class="dot">.</span></h1>
+      <p class="lede" id="lede">Bezig met ophalen…</p>
+    </div>
+    <dl class="vitals" id="vitals" aria-label="Kerncijfers"></dl>
+  </section>
+
+  <section class="toolbar" aria-label="Filters">
+    <div class="seg" role="group" aria-label="Periode">
+      <button class="seg__btn" data-when="all" type="button">Alles</button>
+      <button class="seg__btn" data-when="overdue" type="button">Verlopen <span class="seg__n" data-n="overdue">0</span></button>
+      <button class="seg__btn" data-when="7" type="button">7 dagen <span class="seg__n" data-n="7">0</span></button>
+      <button class="seg__btn" data-when="30" type="button">30 dagen <span class="seg__n" data-n="30">0</span></button>
+      <button class="seg__btn" data-when="90" type="button">90 dagen</button>
+    </div>
+    <div class="seg" role="group" aria-label="Status">
+      <button class="seg__btn" data-state="all" type="button">Elke status</button>
+      <button class="seg__btn" data-state="unsubmitted" type="button">Open</button>
+      <button class="seg__btn" data-state="submitted" type="button">Ingediend</button>
+      <button class="seg__btn" data-state="graded" type="button">Beoordeeld</button>
+    </div>
+    <label class="field">
+      <span class="field__label">Cursus</span>
+      <select id="course"><option value="">alle</option></select>
+    </label>
+    <label class="search">
+      <svg viewBox="0 0 16 16" aria-hidden="true"><circle cx="7" cy="7" r="4.4" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M10.4 10.4 14 14" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+      <input id="q" type="search" placeholder="Zoek opdracht of criterium" autocomplete="off">
+    </label>
+    <button id="clear" class="btn btn--ghost btn--sm" type="button" hidden>Filters wissen</button>
+  </section>
+
+  <div class="grid">
+    <section class="col col--main" aria-labelledby="tl-h">
+      <div class="panel">
+        <div class="col__head">
+          <h2 id="tl-h">Tijdlijn</h2>
+          <span class="count" id="tl-count"></span>
+        </div>
+        <div id="timeline" class="timeline" aria-live="polite"></div>
+      </div>
+
+      <section class="inbox panel" aria-labelledby="inbox-h">
+        <div class="col__head">
+          <h2 id="inbox-h">Documenten</h2>
+          <span class="count" id="inbox-count"></span>
+        </div>
+
+        <div class="drop" id="drop">
+          <div class="drop__title">Sleep hier je bewijsstukken</div>
+          <div class="drop__hint">
+            Wordt lokaal bewaard, niet geüpload naar Canvas. Portflow accepteert tot 500 MB per bestand
+            en converteert <code>.docx</code> naar PDF — lever PDF aan als de opmaak telt.
+          </div>
+          <div class="drop__row">
+            <button class="btn btn--accent" type="button" id="pick">
+              <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 3.5v9M3.5 8h9" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>
+              Bestand kiezen
+            </button>
+            <button class="btn" type="button" id="reveal">
+              <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M2 5.5A1.5 1.5 0 0 1 3.5 4h2.2l1.2 1.6h5.6A1.5 1.5 0 0 1 14 7.1v4.4A1.5 1.5 0 0 1 12.5 13h-9A1.5 1.5 0 0 1 2 11.5z" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/></svg>
+              Map openen
+            </button>
+          </div>
+          <input type="file" id="file" multiple hidden>
+        </div>
+
+        <div id="doclist" class="docs" aria-live="polite"></div>
+      </section>
+    </section>
+
+    <aside class="col col--side" aria-labelledby="cov-h">
+      <div class="panel">
+        <div class="col__head col__head--sticky">
+          <h2 id="cov-h">Criteria</h2>
+          <div class="sidehead">
+            <div class="meter" id="meter" role="img" aria-label="Dekking">
+              <span class="meter__fill" id="meterfill"></span>
+            </div>
+            <span class="count" id="cov-count"></span>
+          </div>
+          <div class="seg seg--tight" role="group" aria-label="Criteria-filter">
+            <button class="seg__btn" data-cov="all" type="button">Alles</button>
+            <button class="seg__btn" data-cov="gap" type="button">Gaten</button>
+            <button class="seg__btn" data-cov="done" type="button">Afgevinkt</button>
+          </div>
+        </div>
+        <div id="coverage" class="coverage" aria-live="polite"></div>
+      </div>
+    </aside>
+  </div>
+
+  <footer class="footer">
+    <p>
+      Data via de Canvas REST API. Het token blijft op de server; deze pagina krijgt het nooit te zien.
+      Notities en afvinkingen staan in <code>dashboard/state.json</code>, documenten in
+      <code>dashboard/documents/</code>.
+    </p>
+    <p class="muted" id="foot-stat"></p>
+  </footer>
+
+</main>
+
+<div id="drawer" class="drawer" hidden aria-modal="true" role="dialog" aria-labelledby="drawer-title">
+  <div class="drawer__scrim" data-close></div>
+  <div class="drawer__panel" role="document">
+    <header class="drawer__top">
+      <div>
+        <p class="eyebrow" id="drawer-eyebrow"></p>
+        <h2 id="drawer-title"></h2>
+      </div>
+      <button class="btn btn--icon" type="button" data-close aria-label="Sluiten">
+        <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M4 4l8 8M12 4l-8 8" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
+      </button>
+    </header>
+    <div class="drawer__body" id="drawer-body"></div>
+  </div>
+</div>
+
+<div id="toast" class="toast" hidden role="status"></div>
+
+<script src="/app.js" type="module"></script>
+</body>
+</html>

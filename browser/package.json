@@ -1,0 +1,16 @@
+{
+  "name": "cavascp-browser",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Browserautomatisering voor Portflow, met een persistent profiel. Wachtwoorden komen hier nooit in.",
+  "engines": { "node": ">=20" },
+  "private-notes": {
+    "playwright": "Playwright staat al in D:/Dropshippingv0.1tool/.mcp-tools/node_modules. scripts/load-playwright.mjs laadt het daar vandaan, zodat hier geen tweede kopie van ~400 MB nodig is.",
+    "chrome": "We gebruiken channel:'chrome' (de geinstalleerde Chrome) in plaats van de gebundelde Chromium, om versiemismatch te voorkomen."
+  },
+  "scripts": {
+    "login": "node login.mjs",
+    "recon": "node recon.mjs"
+  }
+}

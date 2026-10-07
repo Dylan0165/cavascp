@@ -1,0 +1,16 @@
+{
+  "name": "cavascp-dashboard",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Lokaal dashboard voor Canvas @ Fontys ICT: portfolio-deadlines, criteria-dekking en bewijs.",
+  "engines": {
+    "node": ">=22"
+  },
+  "main": "server.mjs",
+  "scripts": {
+    "start": "node server.mjs",
+    "test": "node test-dashboard.mjs",
+    "shot": "node shot-drawer.mjs"
+  }
+}
