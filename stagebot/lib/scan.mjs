@@ -108,15 +108,17 @@ export function schoonTitel(titel) {
     .filter(Boolean);
 
   if (delen.length > 1) {
-    // Het langste deel is meestal de bedrijfsnaam, maar "Home" is dat niet.
+    /*
+     * Het eerste bruikbare deel is de bedrijfsnaam. Sites zetten hun naam
+     * vooraan: "Informa | Dataoplossingen", "Lancyr - verzekeringen".
+     *
+     * Eerst koos ik het deel dat het meest op een naam leek, maar dan werd
+     * "Informa | Dataoplossingen" ineens "Dataoplossingen". Het eerste deel is
+     * de betere regel, en "Home - Informa" werkt ook omdat "Home" er als
+     * rommel uit gaat.
+     */
     const bruikbaar = delen.filter((d) => !rommel.test(d));
-    if (bruikbaar.length) {
-      // Kies het deel dat het meest op een naam lijkt: niet te lang, niet te kort.
-      uit = bruikbaar.sort((a, b) => {
-        const score = (s) => (s.length >= 3 && s.length <= 30 ? 100 : 0) - Math.abs(s.length - 12);
-        return score(b) - score(a);
-      })[0];
-    }
+    if (bruikbaar.length) uit = bruikbaar[0];
   }
 
   return uit.replace(/\s+/g, ' ').trim();

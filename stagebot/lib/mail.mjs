@@ -100,6 +100,8 @@ function normaliseer(uit, bedrijf, profiel) {
   const handtekening = [
     '',
     '',
+    'Met vriendelijke groet,',
+    '',
     profiel.naam,
     [profiel.opleiding, profiel.instelling].filter(Boolean).join(', '),
     profiel.email || null,
@@ -212,8 +214,13 @@ export function keurMail(mail, profiel = leesProfiel()) {
   const gevonden = hol.filter((h) => body.toLowerCase().includes(h));
   if (gevonden.length) punten.push(`holle frases: ${gevonden.join(', ')}`);
 
-  // Een opt-out is verplicht voor zakelijke e-mail.
-  const optOut = /(geen interesse|niet ge[ïi]nteresseerd|laat het weten als|dan hoor ik het graag|als dit niet)/i;
+  /*
+   * Een opt-out is verplicht voor zakelijke e-mail. We kijken naar de strekking
+   * en niet naar één vaste zin, want het model formuleert het elke keer anders:
+   * "een nee is ook goed", "laat het vooral weten als", "dan hoor ik het graag".
+   */
+  const optOut =
+    /(nee is ook goed|geen interesse|niet ge[ïi]nteresseerd|laat het (vooral |gerust |even )?weten|dan hoor ik het graag|als (dit|deze|jullie) (niets|geen)|hoeft u (niet|geen)|dank is ook goed)/i;
   if (!optOut.test(`${body}\n${mail.volledig}`)) {
     punten.push('geen regel waarin ze kunnen afwijzen — dat is verplicht bij zakelijke e-mail');
   }
