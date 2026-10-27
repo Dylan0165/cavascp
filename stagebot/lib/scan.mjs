@@ -84,7 +84,42 @@ export function tekstVanHtml(html) {
 /** De titel van de pagina. */
 function titelVanHtml(html) {
   const m = String(html).match(/<title[^>]*>([\s\S]*?)<\/title>/i);
-  return m ? m[1].replace(/\s+/g, ' ').trim() : '';
+  if (!m) return '';
+  return schoonTitel(m[1].replace(/\s+/g, ' ').trim());
+}
+
+/**
+ * Maakt een nette bedrijfsnaam van een paginatitel.
+ *
+ * "Home - Informa" is de titel van de pagina, maar het bedrijf heet Informa.
+ * Zonder dit komt die rommel in je lijst én in de mail terecht, en dan begint
+ * je bericht met "Beste team van Home - Informa".
+ */
+export function schoonTitel(titel) {
+  let uit = String(titel || '').trim();
+
+  // Delen die niets over het bedrijf zeggen.
+  const rommel = /^(home|homepage|start|welkom|welcome|index|over ons|contact)$/i;
+
+  // Splits op de scheidingstekens die sites gebruiken.
+  const delen = uit
+    .split(/\s*[|•·–—]\s*|\s+-\s+/)
+    .map((d) => d.trim())
+    .filter(Boolean);
+
+  if (delen.length > 1) {
+    // Het langste deel is meestal de bedrijfsnaam, maar "Home" is dat niet.
+    const bruikbaar = delen.filter((d) => !rommel.test(d));
+    if (bruikbaar.length) {
+      // Kies het deel dat het meest op een naam lijkt: niet te lang, niet te kort.
+      uit = bruikbaar.sort((a, b) => {
+        const score = (s) => (s.length >= 3 && s.length <= 30 ? 100 : 0) - Math.abs(s.length - 12);
+        return score(b) - score(a);
+      })[0];
+    }
+  }
+
+  return uit.replace(/\s+/g, ' ').trim();
 }
 
 /** De meta-omschrijving. */

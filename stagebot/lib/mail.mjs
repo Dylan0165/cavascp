@@ -80,7 +80,22 @@ Schrijf de mail. Geef als JSON:
 function normaliseer(uit, bedrijf, profiel) {
   const onderwerp = String(uit.onderwerp ?? '').trim() || `Stageplek bij ${bedrijf.titel || bedrijf.domein}`;
   const aanhef = String(uit.aanhef ?? '').trim() || 'Beste,';
-  const body = String(uit.body ?? '').trim();
+
+  let body = String(uit.body ?? '').trim();
+
+  /*
+   * Het model zet de aanhef vaak zelf ook nog boven de body. Dan staat hij
+   * dubbel in de mail: één keer van het veld `aanhef`, één keer in de tekst.
+   * We halen de eerste regel weg als die op de aanhef lijkt.
+   */
+  body = stripDubbeleAanhef(body, aanhef);
+
+  /*
+   * En hetzelfde aan de onderkant: het model sluit af met "Met vriendelijke
+   * groet," en zijn naam, waarna wij nog een handtekening toevoegen. Dan staat
+   * je naam er twee keer.
+   */
+  body = stripAfsluiting(body);
 
   const handtekening = [
     '',
@@ -111,6 +126,62 @@ function normaliseer(uit, bedrijf, profiel) {
       geschreven: new Date().toISOString(),
     },
   };
+}
+
+/** Haalt een aanhef weg die het model zelf al boven de body zette. */
+function stripDubbeleAanhef(body, aanhef) {
+  const regels = body.split('\n');
+  if (!regels.length) return body;
+
+  // De eerste niet-lege regel.
+  const eersteIndex = regels.findIndex((r) => r.trim());
+  if (eersteIndex === -1) return body;
+
+  const normal = (s) =>
+    s
+      .toLowerCase()
+      .replace(/[^a-z\s]/g, '')
+      .replace(/\s+/g, ' ')
+      .trim();
+
+  if (normal(regels[eersteIndex]) === normal(aanhef)) {
+    regels.splice(0, eersteIndex + 1);
+    // En de lege regel erachter.
+    while (regels.length && !regels[0].trim()) regels.shift();
+    return regels.join('\n').trim();
+  }
+  return body;
+}
+
+/** Haalt een afsluiting met naam weg, zodat wij die kunnen toevoegen. */
+function stripAfsluiting(body) {
+  const afsluiters = [
+    'met vriendelijke groet',
+    'vriendelijke groet',
+    'hartelijke groet',
+    'met vriendelijke groeten',
+    'groet',
+    'groeten',
+    'kind regards',
+    'best regards',
+    'regards',
+  ];
+  const regels = body.split('\n');
+
+  // Van onderen zoeken naar de laatste afsluiter.
+  for (let i = regels.length - 1; i >= 0; i -= 1) {
+    const schoon = regels[i].trim().toLowerCase().replace(/[,!.]/g, '');
+    if (!schoon) continue;
+    if (afsluiters.includes(schoon)) {
+      return regels.slice(0, i).join('\n').trim();
+    }
+    /*
+     * Maximaal vier regels terugkijken. Anders kan een "groet" midden in de
+     * mail per ongeluk als afsluiting gelden en verlies je inhoud.
+     */
+    if (regels.length - i > 4) break;
+  }
+  return body;
 }
 
 /**
