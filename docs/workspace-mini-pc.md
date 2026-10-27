@@ -42,13 +42,29 @@ op je Tailscale-netwerk. Alleen doen als je dat bewust wilt.
 
 ## Starten en stoppen
 
+Het dashboard draait als **systemd-service**, dus het start vanzelf na een reboot
+en blijft draaien als je uitlogt.
+
+```bash
+systemctl --user status cavascp    # draait het?
+systemctl --user restart cavascp   # herstarten na een wijziging
+systemctl --user stop cavascp      # stoppen
+tail -f ~/cavascp/dashboard/server.log   # meekijken
+```
+
+Handmatig starten kan ook — handig tijdens ontwikkelen, want dan zie je fouten
+direct:
+
 ```bash
 cd ~/cavascp
-./tools/start-dashboard.sh          # starten op de achtergrond
-./tools/start-dashboard.sh --remote # ook via Tailscale bereikbaar
-pkill -f "node server.mjs"          # stoppen
-tail -f dashboard/server.log        # meekijken
+systemctl --user stop cavascp        # eerst de service stoppen
+./tools/start-dashboard.sh           # dan zelf starten
+./tools/start-dashboard.sh --remote  # ook via Tailscale bereikbaar
+pkill -f "node server.mjs"           # stoppen
 ```
+
+Een service en een los proces kunnen niet allebei op poort 8787 zitten. Stop dus
+altijd één van de twee.
 
 ## Wat er wel werkt en wat niet
 
