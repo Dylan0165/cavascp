@@ -88,8 +88,29 @@ Elke Portflow-actie start een browser en doorloopt de Canvas LTI-launch. Reken o
 
 ## MCP-server
 
-De server staat al in `~/.dsh/profiles/web/cordis.patch.yml` onder `mcp-cavascp`.
-Herstart DSH om hem te laden.
+De server staat in `~/.dsh/profiles/web/cordis.patch.yml` als `insert`-rij
+`mcp-cavascp`:
+
+```yaml
+- insert:
+    - id: mcp-cavascp
+      name: "@deepseek-ai/dsh-mcp-client"
+      config:
+        serverName: cavascp
+        transport: stdio
+        command: /usr/local/bin/node
+        args:
+          - /home/ubuntu/cavascp/mcp/server.mjs
+        cwd: /home/ubuntu/cavascp
+```
+
+Er staat bewust **geen** `env` in: `mcp/server.mjs` leest het token zelf uit
+`.env` in de projectmap. DSH filtert ambient `*TOKEN*`-variabelen weg voordat
+het serverproces start, dus een `env:`-blok zou het token juist moeten
+herhalen — en dan staat het op twee plekken.
+
+DSH herlaadt de patchlaag; een draaiende sessie krijgt de tools er meestal
+zonder herstart bij. Gebeurt dat niet, herstart DSH dan.
 
 | Tool | Waarvoor |
 |---|---|
@@ -160,21 +181,21 @@ geïmplementeerd, dus opstarten kost geen netwerk en geen installatie.
 
 1. Canvas-token aanmaken: **Account → Settings → "+ New Access Token"**
    (of *Regenerate Token* op de Access Token Details-pagina).
-2. Token in `~/.dsh/.env` zetten:
+2. Token in `.env` in de projectmap zetten:
 
    ```
    CANVAS_TOKEN=1234~abcdef...
    ```
 
-3. De server staat al in `~/.dsh/profiles/web/cordis.patch.yml` onder
-   `mcp-cavascp`. Herstart DSH om hem te laden.
+3. De `mcp-cavascp`-rij in `~/.dsh/profiles/web/cordis.patch.yml` laten staan
+   (hierboven). Het pad in `args` moet naar `mcp/server.mjs` op die machine
+   wijzen; op Windows bijvoorbeeld `D:\\cavascp\\mcp\\server.mjs`.
 
 Het token heeft de vorm `<developerkey-id>~<65 tekens>`. Eén verkeerd teken
 geeft `401 Invalid access token` — gebruik het kopieer-icoontje, typ het niet over.
 
-Het dashboard en de MCP lezen hetzelfde token. Zet het in `D:/cavascp/.env` voor
-het dashboard en de Python-tools, en in `~/.dsh/.env` voor de MCP (DSH filtert
-ambient `*TOKEN*`-variabelen weg, dus daar moet hij expliciet staan).
+Het dashboard, de MCP en de stagebot lezen hetzelfde token uit dezelfde `.env`.
+Er is geen tweede plek waar het moet staan.
 
 ## Ontwerpkeuzes
 
