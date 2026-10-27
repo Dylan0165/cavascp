@@ -185,6 +185,17 @@ export function vindTech(tekst) {
   const gevonden = [];
   for (const t of TECH) {
     const naam = t.toLowerCase();
+    /*
+     * Korte namen als "Go", "PHP" en "SQL" moeten als woord voorkomen. Zonder
+     * woordgrens matcht "Go" op "Governance" en "Dataopslag", en dan staat er
+     * ineens "Go" in de analyse terwijl ze niets met Go doen.
+     */
+    if (naam.length <= 4) {
+      const veilig = naam.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      const grens = new RegExp(`(^|[^a-z0-9+#.])${veilig}([^a-z0-9+#]|$)`, 'i');
+      if (grens.test(laag)) gevonden.push(t);
+      continue;
+    }
     if (laag.includes(naam)) gevonden.push(t);
   }
   return [...new Set(gevonden)];
