@@ -201,15 +201,36 @@ async function main() {
     case 'canvas': {
       // Het profiel aanvullen met wat er in Canvas staat.
       const { loadEnvFile, createCanvas } = await import('../mcp/lib/canvas.mjs');
-      const { ENV_PAD } = await import('../mcp/lib/paden.mjs');
-      const env = await loadEnvFile(ENV_PAD);
-      if (!env?.CANVAS_TOKEN) {
-        console.log('  Geen Canvas-token gevonden in .env');
+      const { ENV_PAD, vindEnv } = await import('../mcp/lib/paden.mjs');
+
+      const envPad = vindEnv();
+      if (!envPad) {
+        console.log('\n  Geen .env gevonden. Zet CANVAS_TOKEN in .env in de projectmap.\n');
         return 1;
       }
+
+      const env = await loadEnvFile(envPad);
+      if (!env?.CANVAS_TOKEN) {
+        console.log(`\n  ${envPad} gevonden, maar er staat geen CANVAS_TOKEN in.`);
+        console.log(`  Gevonden sleutels: ${Object.keys(env || {}).join(', ') || 'geen'}\n`);
+        return 1;
+      }
+
+      console.log(`\n  Token gevonden in ${envPad} (${env.CANVAS_TOKEN.length} tekens)`);
+      console.log(`  Server: ${env.CANVAS_BASE_URL || 'https://fhict.instructure.com'}`);
+
       const canvas = createCanvas({ baseUrl: env.CANVAS_BASE_URL, token: env.CANVAS_TOKEN });
-      console.log('\n  Canvas lezen…');
-      const profiel = await verrijkVanuitCanvas(canvas);
+      console.log('  Canvas lezen…');
+      let profiel;
+      try {
+        profiel = await verrijkVanuitCanvas(canvas);
+      } catch (fout) {
+        console.log(`\n  Canvas weigerde het verzoek: ${fout.message}`);
+        console.log('  Controleer of het token nog geldig is (Canvas → Account → Instellingen →');
+        console.log('  Nieuwe toegangssleutel). Een token verloopt of kan ingetrokken zijn.\n');
+        return 1;
+      }
+
       const cursussen = profiel.canvas?.cursussen ?? [];
       console.log(`  ${cursussen.length} cursussen:`);
       for (const c of cursussen.slice(0, 12)) {
