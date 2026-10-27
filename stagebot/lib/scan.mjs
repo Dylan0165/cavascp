@@ -97,6 +97,48 @@ function omschrijvingVanHtml(html) {
 }
 
 /**
+ * Herkent een anti-bot-pagina.
+ *
+ * Steeds meer sites zetten een controle voor de deur: Cloudflare ("Just a
+ * moment"), Anubis, een captcha. Zo'n pagina is kort, bevat geen echte inhoud,
+ * en zou zonder deze controle als bedrijfsprofiel opgeslagen worden. Dan staat
+ * er "Human verification" in je lijst als bedrijfsnaam en schrijf je een mail
+ * naar niemand.
+ *
+ * Beter om het te herkennen en te zeggen: deze site houdt bots tegen, open hem
+ * zelf even.
+ */
+const BOT_MARKERS = [
+  'human verification',
+  'checking if you',
+  "you're human",
+  'just a moment',
+  'attention required',
+  'enable javascript and cookies',
+  'cf-browser-verification',
+  'anubis',
+  'ddos protection',
+  'captcha',
+  'are you a robot',
+  'verify you are human',
+  'access denied',
+  'toegang geweigerd',
+  'beveiligingscontrole',
+];
+
+export function isBotPagina(tekst, titel = '') {
+  const samen = `${titel}\n${tekst}`.toLowerCase();
+  const treffer = BOT_MARKERS.find((m) => samen.includes(m));
+  if (!treffer) return null;
+
+  // Een lange pagina met toevallig het woord "captcha" in de footer telt niet.
+  // Een echte blokkade is kort en heeft nauwelijks inhoud.
+  if (tekst.length > 1500) return null;
+
+  return treffer;
+}
+
+/**
  * E-mailadressen uit de tekst.
  *
  * We filteren de rommel eruit die op elke site staat: voorbeeldadressen uit
@@ -181,16 +223,33 @@ export function domeinVan(url) {
  *
  * @param {string} invoer  url of domein
  * @returns {Promise<object>}
- */
-export async function scanBedrijf(invoer) {
+ */export async function scanBedrijf(invoer) {
   const basis = normaliseerUrl(invoer);
   const eerste = await haalHtml(basis);
   if (!eerste) {
     throw new Error(`Kon ${basis} niet lezen. Bestaat de site, en blokkeert hij geen bots?`);
   }
 
-  const paginas = [{ url: eerste.url, tekst: tekstVanHtml(eerste.html) }];
-  const titel = titelVanHtml(eerste.html);
+  const eersteTekst = tekstVanHtml(eerste.html);
+  const eersteTitel = titelVanHtml(eerste.html);
+
+  /*
+   * Eerst kijken of we niet naar een anti-bot-pagina zitten te kijken. Zo ja,
+   * dan stoppen we meteen: doorgaan levert een bedrijfsprofiel op dat over
+   * niets gaat, en een mail die naar niemand verwijst.
+   */
+  const blokkade = isBotPagina(eersteTekst, eersteTitel);
+  if (blokkade) {
+    const fout = new Error(
+      `Deze site houdt geautomatiseerd bezoek tegen (${blokkade}). ` +
+        'Open hem zelf in je browser en gebruik "scan --tekst" met de tekst die je ziet.',
+    );
+    fout.blokkade = blokkade;
+    throw fout;
+  }
+
+  const paginas = [{ url: eerste.url, tekst: eersteTekst }];
+  const titel = eersteTitel;
   const omschrijving = omschrijvingVanHtml(eerste.html);
 
   // Een paar extra pagina's proberen. Stil falen als ze niet bestaan.
@@ -219,4 +278,53 @@ export async function scanBedrijf(invoer) {
     tekst: alles,
     gescand: new Date().toISOString(),
   };
+}
+
+/**
+ * Een bedrijf lezen uit tekst die jij aanlevert.
+ *
+ * Voor sites die bots tegenhouden, zoals cco.nl met Anubis. Je opent de site
+ * zelf, kopieert wat er staat, en plakt het hier in. De bot doet de rest: de
+ *zelfde analyse, alleen zonder het ophalen.
+ *
+ * Dat is geen verslechtering: jij ziet de site beter dan een scraper, want jij
+ * ziet ook de vacaturepagina's die achter een knop zitten.
+ *
+ * @param {string} invoer  de url of het domein, voor de administratie
+ * @param {string} tekst   de tekst die je hebt gekopieerd
+ * @param {object} [extra] titel en omschrijving als je die weet
+ */
+export function scanVanTekst(invoer, tekst, extra = {}) {
+  const schoon = String(tekst || '')
+    .split('\n')
+    .map((r) => r.replace(/\s+/g, ' ').trim())
+    .filter(Boolean)
+    .join('\n');
+
+  if (schoon.length < 60) {
+    throw new Error('De tekst is te kort om iets mee te kunnen. Kopieer wat meer van de pagina.');
+  }
+
+  const basis = normaliseerUrl(invoer);
+
+  return {
+    url: basis,
+    domein: domeinVan(basis),
+    titel: extra.titel || titelVanTekst(schoon) || domeinVan(basis),
+    omschrijving: extra.omschrijving || '',
+    emails: vindEmails(schoon),
+    tech: vindTech(schoon),
+    stageSignaal: vindStageSignaal(schoon),
+    paginas: [{ url: basis, tekens: schoon.length }],
+    tekst: schoon,
+    gescand: new Date().toISOString(),
+    // Zodat je later weet dat dit niet automatisch is opgehaald.
+    bron: 'handmatig',
+  };
+}
+
+/** Een titel raden uit de eerste regels tekst. */
+function titelVanTekst(tekst) {
+  const eerste = String(tekst).split('\n').find((r) => r.length > 3 && r.length < 80);
+  return eerste ? eerste.trim() : '';
 }

@@ -10,13 +10,12 @@
  *   node stagebot/cli.mjs ai
  */
 
-import { scanBedrijf } from './lib/scan.mjs';
+import { scanBedrijf, scanVanTekst } from './lib/scan.mjs';
 import { voegToe, zoekBedrijf, leesBedrijven, telPerStatus, werkBij, STATUS } from './lib/bedrijven.mjs';
 import { schrijfMail, keurMail } from './lib/mail.mjs';
 import { leesProfiel, bewaarProfiel, profielAlsTekst, verrijkVanuitCanvas } from './lib/profiel.mjs';
 import { aiBeschikbaar, vindSleutel } from './lib/deepseek.mjs';
 import { readFileSync } from 'node:fs';
-import { inProject } from '../mcp/lib/paden.mjs';
 
 const [, , commando, ...rest] = process.argv;
 
@@ -28,10 +27,14 @@ function gebruik() {
   De stagebot
 
     node stagebot/cli.mjs scan <url>      een bedrijf lezen en bewaren
+    node stagebot/cli.mjs scan <url> --tekst <bestand>
+                                          zelf geplakte tekst inlezen, voor sites
+                                          die bots tegenhouden
     node stagebot/cli.mjs lijst           wat je hebt
     node stagebot/cli.mjs mail <id>       een mail schrijven
     node stagebot/cli.mjs toon <id>       de mail bekijken
     node stagebot/cli.mjs profiel         jouw profiel bekijken
+    node stagebot/cli.mjs canvas          je vakken uit Canvas in het profiel zetten
     node stagebot/cli.mjs ai              is er een taalmodel?
 
   Voorbeelden:
@@ -48,8 +51,39 @@ async function main() {
         console.log('  welke site? bijvoorbeeld: node stagebot/cli.mjs scan cco.nl');
         return 1;
       }
-      console.log(`\n  ${url} lezen…`);
-      const scan = await scanBedrijf(url);
+
+      /*
+       * Handmatige route: `scan cco.nl --tekst pagina.txt`.
+       *
+       * Nodig voor sites die bots tegenhouden. Jij opent de site, kopieert wat
+       * er staat, en de bot doet dezelfde analyse zonder het ophalen.
+       */
+      const tekstIndex = rest.indexOf('--tekst');
+      let scan;
+      if (tekstIndex !== -1) {
+        const bestand = rest[tekstIndex + 1];
+        if (!bestand) {
+          console.log('  welk bestand? bijvoorbeeld: scan cco.nl --tekst cco.txt');
+          return 1;
+        }
+        const tekst = readFileSync(bestand, 'utf8');
+        console.log(`\n  ${url} lezen uit ${bestand}…`);
+        scan = scanVanTekst(url, tekst);
+      } else {
+        console.log(`\n  ${url} lezen…`);
+        try {
+          scan = await scanBedrijf(url);
+        } catch (fout) {
+          if (fout.blokkade) {
+            console.log(`\n  Deze site houdt bots tegen (${fout.blokkade}).`);
+            console.log('  Open hem zelf in je browser, kopieer de tekst naar een bestand,');
+            console.log(`  en doe dan: node stagebot/cli.mjs scan ${url} --tekst jouwbestand.txt\n`);
+            return 1;
+          }
+          throw fout;
+        }
+      }
+
       console.log(`  ${scan.paginas.length} pagina('s), ${scan.tekst.length} tekens`);
       if (scan.emails.length) console.log(`  e-mail: ${scan.emails.slice(0, 4).join(', ')}`);
       else console.log('  geen e-mailadres gevonden — je zult er zelf een moeten zoeken');
