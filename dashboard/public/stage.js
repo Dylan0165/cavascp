@@ -390,6 +390,62 @@ async function zetStatus(id, status) {
   renderKop();
 }
 
+/* ─────────────────────────── gmail koppelen ───────────────────────────── */
+
+function gmailFout(tekst) {
+  $('#gmail-fout').textContent = tekst || '';
+}
+
+function openGmail() {
+  const o = state.overzicht;
+  const gekoppeld = Boolean(o?.gmail?.gekoppeld);
+  $('#gmail-titel').textContent = gekoppeld ? 'Gmail is gekoppeld' : 'Gmail koppelen';
+  $('#gmail-uitleg').hidden = gekoppeld;
+  $('#gmail-gebruiker').value = o?.gmail?.gebruiker ?? o?.profiel?.email ?? '';
+  $('#gmail-wachtwoord').value = '';
+  $('#gmail-ontkoppel').hidden = !gekoppeld;
+  $('#gmail-koppel').textContent = gekoppeld ? 'Opnieuw koppelen' : 'Koppelen';
+  gmailFout('');
+  $('#gmail-dialoog').showModal();
+}
+
+async function koppelGmail(gebeurtenis) {
+  gebeurtenis.preventDefault();
+  gmailFout('');
+  const gebruiker = $('#gmail-gebruiker').value.trim();
+  const wachtwoord = $('#gmail-wachtwoord').value;
+  const knop = $('#gmail-koppel');
+  knop.disabled = true;
+  knop.textContent = 'Controleren bij Gmail…';
+
+  try {
+    const { overzicht } = await api('/api/gmail/koppel', { body: { gebruiker, wachtwoord } });
+    state.overzicht = overzicht;
+    renderKop();
+    $('#gmail-wachtwoord').value = '';
+    $('#gmail-dialoog').close();
+    melding(`Gmail gekoppeld als ${gebruiker}. Je kunt nu versturen.`);
+  } catch (fout) {
+    gmailFout(fout.message);
+  } finally {
+    knop.disabled = false;
+    knop.textContent = 'Koppelen';
+  }
+}
+
+async function ontkoppelGmail() {
+  if (!window.confirm('Gmail ontkoppelen? Versturen kan daarna niet meer.')) return;
+  try {
+    const { overzicht } = await api('/api/gmail/ontkoppel', { body: {} });
+    state.overzicht = overzicht;
+    renderKop();
+    $('#gmail-dialoog').close();
+    melding('Gmail ontkoppeld.');
+  } catch (fout) {
+    gmailFout(fout.message);
+  }
+}
+
 async function verstuur(b) {
   if (state.bezig) return;
   const naar = (b.emails ?? [])[0];
@@ -575,6 +631,14 @@ function start() {
 
   $('#dagrun').addEventListener('click', dagrun);
   $('#verstuur-alles').addEventListener('click', verstuurAlles);
+  $('#gmail').addEventListener('click', openGmail);
+  $('#logout').addEventListener('click', async () => {
+    await fetch('/api/auth/logout', { method: 'POST' });
+    location.href = '/login';
+  });
+  $('#gmail-vorm').addEventListener('submit', koppelGmail);
+  $('#gmail-ontkoppel').addEventListener('click', ontkoppelGmail);
+  $('#gmail-sluit').addEventListener('click', () => $('#gmail-dialoog').close());
   $('#aanvoer-eigen').addEventListener('click', () => zoek('eigen'));
   $('#aanvoer-osm').addEventListener('click', () => zoek('osm'));
 

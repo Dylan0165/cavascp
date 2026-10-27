@@ -18,6 +18,9 @@ data/raw/
 dashboard/state.json
 dashboard/documents.json
 
+# Je dashboard-wachtwoord (hash) en de Gmail-koppeling: nooit in versiebeheer.
+dashboard/auth.json
+
 # Schermafbeeldingen van je eigen portfolio: alleen voor lokaal gebruik.
 dashboard/preview/
 

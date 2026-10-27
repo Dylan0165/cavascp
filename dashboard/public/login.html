@@ -1,0 +1,161 @@
+<!doctype html>
+<html lang="nl" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>cavascp — inloggen</title>
+<meta name="color-scheme" content="dark light">
+<meta name="referrer" content="no-referrer">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='24' fill='%23e2a63f'/><path d='M28 34h44v8H28zm0 14h44v8H28zm0 14h28v8H28z' fill='%231a1408'/></svg>">
+<style>
+  /*
+   * Los van styles.css: deze pagina moet het ook doen als de rest van het
+   * dashboard stuk is. Dezelfde maten en kleuren, zodat het niet als een
+   * vreemd venster voelt.
+   */
+  :root {
+    --bg: oklch(17% 0.014 155);
+    --panel: oklch(21% 0.017 155);
+    --line: oklch(30% 0.02 155);
+    --ink: oklch(94% 0.01 148);
+    --ink-2: oklch(78% 0.013 150);
+    --ink-3: oklch(62% 0.012 150);
+    --green: oklch(72% 0.093 152);
+    --clay: oklch(68% 0.125 42);
+    --font: "Segoe UI Variable Text", "Segoe UI", system-ui, -apple-system, sans-serif;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; min-height: 100dvh; display: grid; place-items: center;
+    background: radial-gradient(1200px 600px at 50% -10%, oklch(24% 0.03 152), var(--bg));
+    color: var(--ink); font-family: var(--font); padding: 1.5rem;
+  }
+  .kaart {
+    width: 100%; max-width: 26rem; background: var(--panel);
+    border: 1px solid var(--line); border-radius: .875rem; padding: 1.75rem;
+    box-shadow: 0 24px 60px -30px rgb(0 0 0 / .8);
+  }
+  .mark { width: 2rem; height: 2rem; border-radius: .5rem; background: var(--green); opacity: .9; margin-bottom: 1rem; }
+  h1 { margin: 0 0 .25rem; font-size: 1.25rem; letter-spacing: -.01em; }
+  p.uitleg { margin: 0 0 1.25rem; color: var(--ink-3); font-size: .875rem; line-height: 1.5; }
+  label { display: block; font-size: .8125rem; color: var(--ink-2); margin-bottom: .375rem; }
+  input {
+    width: 100%; padding: .625rem .75rem; margin-bottom: .875rem;
+    background: var(--bg); color: var(--ink); border: 1px solid var(--line);
+    border-radius: .5rem; font: inherit;
+  }
+  input:focus-visible { outline: 2px solid var(--green); outline-offset: 1px; border-color: transparent; }
+  button {
+    width: 100%; padding: .6875rem .75rem; border: 0; border-radius: .5rem;
+    background: var(--green); color: oklch(20% 0.03 152); font: inherit; font-weight: 600;
+    cursor: pointer;
+  }
+  button:disabled { opacity: .6; cursor: progress; }
+  .fout { color: var(--clay); font-size: .8125rem; margin: .75rem 0 0; min-height: 1.1rem; }
+  .voet { margin-top: 1.25rem; color: var(--ink-3); font-size: .75rem; line-height: 1.5; }
+  .verborgen { display: none; }
+</style>
+</head>
+<body>
+<main class="kaart">
+  <div class="mark" aria-hidden="true"></div>
+  <h1 id="titel">cavascp</h1>
+  <p class="uitleg" id="uitleg">Even kijken wie je bent…</p>
+
+  <form id="vorm" class="verborgen" autocomplete="off">
+    <label for="wachtwoord" id="label-wachtwoord">Wachtwoord</label>
+    <input id="wachtwoord" type="password" name="wachtwoord" required autofocus>
+    <div id="herhaal-blok" class="verborgen">
+      <label for="herhaal">Nog een keer</label>
+      <input id="herhaal" type="password" name="herhaal">
+    </div>
+    <button id="knop" type="submit">Inloggen</button>
+    <p class="fout" id="fout" role="alert"></p>
+  </form>
+
+  <p class="voet" id="voet"></p>
+</main>
+
+<script>
+  /*
+   * Twee standen: nog geen wachtwoord (dan stel je er een in) en wel een
+   * wachtwoord (dan log je in). De server beslist; deze pagina vraagt het
+   * alleen en post het terug.
+   */
+  const $ = (id) => document.getElementById(id);
+
+  let heeftWachtwoord = false;
+
+  function toonFout(tekst) {
+    $('fout').textContent = tekst || '';
+  }
+
+  function zetStand(nieuw) {
+    heeftWachtwoord = nieuw;
+    $('vorm').classList.remove('verborgen');
+    $('herhaal-blok').classList.toggle('verborgen', !nieuw ? false : true);
+    $('knop').textContent = nieuw ? 'Inloggen' : 'Wachtwoord instellen';
+
+    if (nieuw) {
+      $('titel').textContent = 'Inloggen';
+      $('uitleg').textContent = 'Je portfolio, documenten en stagebot staan achter dit wachtwoord.';
+      $('label-wachtwoord').textContent = 'Wachtwoord';
+      $('wachtwoord').autocomplete = 'current-password';
+      $('voet').textContent = '';
+    } else {
+      $('titel').textContent = 'Wachtwoord instellen';
+      $('uitleg').textContent =
+        'Kies een wachtwoord van minstens 12 tekens, met letters en cijfers of leestekens. ' +
+        'Je hebt het maar één keer nodig per apparaat.';
+      $('label-wachtwoord').textContent = 'Nieuw wachtwoord';
+      $('wachtwoord').autocomplete = 'new-password';
+      $('voet').textContent =
+        'Doet iemand dit vóórdat jij het doet? Zet het dashboard dan even uit (systemctl --user stop cavascp) ' +
+        'en stel het wachtwoord in vanaf de mini-pc zelf.';
+    }
+  }
+
+  async function status() {
+    const antwoord = await fetch('/api/auth/status');
+    const data = await antwoord.json();
+    zetStand(data.heeftWachtwoord);
+    if (data.ingelogd) location.replace('/dashboard');
+  }
+
+  $('vorm').addEventListener('submit', async (gebeurtenis) => {
+    gebeurtenis.preventDefault();
+    toonFout('');
+
+    const wachtwoord = $('wachtwoord').value;
+    const herhaal = $('herhaal').value;
+    if (!heeftWachtwoord && wachtwoord !== herhaal) {
+      toonFout('De twee wachtwoorden zijn niet gelijk.');
+      return;
+    }
+
+    $('knop').disabled = true;
+    try {
+      const pad = heeftWachtwoord ? '/api/auth/login' : '/api/auth/setup';
+      const antwoord = await fetch(pad, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ wachtwoord }),
+      });
+      const data = await antwoord.json().catch(() => ({}));
+
+      if (!antwoord.ok) {
+        toonFout(data.error || 'Er ging iets mis.');
+        return;
+      }
+      location.replace(data.naar || '/dashboard');
+    } catch {
+      toonFout('De server antwoordde niet.');
+    } finally {
+      $('knop').disabled = false;
+    }
+  });
+
+  status().catch(() => toonFout('Kon de server niet bereiken.'));
+</script>
+</body>
+</html>

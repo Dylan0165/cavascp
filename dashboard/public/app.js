@@ -2591,6 +2591,11 @@ function wire() {
 
   wireDropZone();
 
+  $('#logout')?.addEventListener('click', async () => {
+    await fetch('/api/auth/logout', { method: 'POST' });
+    location.href = '/login';
+  });
+
   $('#theme').addEventListener('click', () => {
     const next = document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark';
     document.documentElement.dataset.theme = next;

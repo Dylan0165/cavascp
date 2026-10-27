@@ -33,6 +33,7 @@ import { checkDocument, naarPortflowGoalIds, semesterMappen } from '../mcp/lib/l
 import { createDocumentStore, parseMultipart } from './lib/documents.mjs';
 import * as werkplek from './lib/documenten.mjs';
 import { createSecurity } from './lib/security.mjs';
+import { heeftWachtwoord, zetWachtwoord, controleerWachtwoord, authPad } from './lib/auth.mjs';
 import {
   leesBedrijven,
   zoekBedrijf,
@@ -48,7 +49,7 @@ import { zoekBedrijven, voegKandidatenToe, seedKandidaten, voegUrlToe } from '..
 import { leesEnSchrijf } from '../stagebot/lib/pijplijn.mjs';
 import { keurMail } from '../stagebot/lib/mail.mjs';
 import { verstuurBedrijf, verstuurGoedgekeurd, kiesAdres } from '../stagebot/lib/versturen.mjs';
-import { gmailBeschikbaar, vindGmailSleutels } from '../stagebot/lib/gmail.mjs';
+import { gmailBeschikbaar, vindGmailSleutels, bewaarGmailSleutels, verwijderGmailSleutels, controleerGmailLogin } from '../stagebot/lib/gmail.mjs';
 import { leesProfiel } from '../stagebot/lib/profiel.mjs';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
@@ -396,46 +397,32 @@ function sendJson(res, status, body) {
 }
 
 /**
- * De bootstrappagina: zet de sessiecookie en stuurt door naar het dashboard.
+ * De startpagina: door naar het dashboard of naar het inlogscherm.
  *
- * Dit is de enige route zonder sessie-eis — anders kwam je er nooit in. De
- * cookie is HttpOnly en SameSite=Strict, dus alleen deze browser kan hem
- * gebruiken en alleen vanaf deze site.
+ * Vroeger zette deze route de sessiecookie zonder meer. Dat kon omdat het
+ * dashboard alleen op localhost luisterde; sinds het op Tailscale bereikbaar is,
+ * zou dat betekenen dat iedereen die de link heeft meteen binnen is.
  */
-function serveBootstrap(res) {
-  security.setCookie(res);
-  const html = `<!doctype html>
-<html lang="nl">
-<head>
-<meta charset="utf-8">
-<meta name="referrer" content="no-referrer">
-<title>cavascp</title>
-<style>
-  body { margin: 0; min-height: 100dvh; display: grid; place-items: center;
-         background: #0a0a0c; color: #ededf0;
-         font-family: "Segoe UI Variable Text", "Segoe UI", system-ui, sans-serif; }
-  main { text-align: center; padding: 24px; }
-  .n { font-family: ui-monospace, Consolas, monospace; font-size: 12px; color: #6c6c76; margin-top: 10px; }
-  a { color: #e2a63f; }
-</style>
-</head>
-<body>
-<main>
-  <h1 style="font-size:20px;margin:0 0 6px">cavascp</h1>
-  <p style="color:#96969f;margin:0">Sessie wordt gezet…</p>
-  <p class="n">sleutel ${security.fingerprint}…</p>
-  <p><a href="/dashboard?k=${security.sessionToken}">Doorgaan</a></p>
-</main>
-<script>location.replace('/dashboard?k=${security.sessionToken}');</script>
-</body>
-</html>`;
-  res.writeHead(200, {
+function serveStart(req, res) {
+  const verdict = security.check(req);
+  res.writeHead(302, {
     ...security.headers(),
-    'Content-Type': 'text/html; charset=utf-8',
-    'Content-Length': Buffer.byteLength(html),
+    Location: verdict.ok ? '/dashboard' : '/login',
     'Cache-Control': 'no-store',
   });
-  res.end(html);
+  res.end();
+}
+
+/** Een pagina waar je ingelogd voor moet zijn. */
+function serveBeveiligd(req, res, bestand) {
+  const verdict = security.check(req);
+  if (!verdict.ok) {
+    res.writeHead(302, { ...security.headers(), Location: '/login', 'Cache-Control': 'no-store' });
+    res.end();
+    return;
+  }
+  security.setCookie(res); // verlengt de sessie bij een herlaadbeurt
+  return serveStatic(req, res, bestand);
 }
 
 async function readBody(req, limit = 512 * 1024) {
@@ -666,21 +653,84 @@ const server = createServer(async (req, res) => {
        Alles onder /api/ is afgeschermd. De pagina zelf is dat niet: die zet
        juist de sessiecookie. */
 
-    if (pathname === '/' || pathname === '') return serveBootstrap(res);
+    if (pathname === '/' || pathname === '') return serveStart(req, res);
 
-    if (pathname === '/dashboard') {
-      security.setCookie(res); // verlengt de sessie bij een herlaadbeurt
-      return serveStatic(req, res, 'index.html');
+    if (pathname === '/login') {
+      const verdict = security.alleenHerkomst(req);
+      if (!verdict.ok) return sendJson(res, verdict.status, { error: verdict.error });
+      return serveStatic(req, res, 'login.html');
     }
+
+    if (pathname === '/dashboard') return serveBeveiligd(req, res, 'index.html');
 
     /*
      * De stagepagina is een tweede scherm op dezelfde server, dezelfde sessie
      * en dezelfde gegevens als het portfolio-dashboard. Bewust geen tweede
      * app: één cookie, één poort, één plek waar het token staat.
      */
-    if (pathname === '/stage') {
+    if (pathname === '/stage') return serveBeveiligd(req, res, 'stage.html');
+
+    /*
+     * Inloggen zelf. Deze routes hebben geen sessie nodig — anders kwam je er
+     * nooit in — maar wel dezelfde herkomstcontrole als de rest.
+     */
+    if (pathname === '/api/auth/status' && req.method === 'GET') {
+      const verdict = security.alleenHerkomst(req);
+      if (!verdict.ok) return sendJson(res, verdict.status, { error: verdict.error });
+      return sendJson(res, 200, {
+        heeftWachtwoord: heeftWachtwoord(),
+        ingelogd: security.check(req).ok,
+      });
+    }
+
+    if (pathname === '/api/auth/setup' && req.method === 'POST') {
+      const verdict = security.alleenHerkomst(req);
+      if (!verdict.ok) return sendJson(res, verdict.status, { error: verdict.error });
+      if (heeftWachtwoord()) {
+        return sendJson(res, 409, { error: 'Er is al een wachtwoord ingesteld.' });
+      }
+      if (!security.loginPogingOk()) {
+        return sendJson(res, 429, { error: 'Te veel pogingen. Wacht vijf minuten.' });
+      }
+      const body = await readBody(req);
+      try {
+        zetWachtwoord(String(body.wachtwoord ?? ''));
+      } catch (fout) {
+        return sendJson(res, 400, { error: fout.message });
+      }
+      security.vernieuwSessie();
       security.setCookie(res);
-      return serveStatic(req, res, 'stage.html');
+      security.loginGelukt();
+      console.log('  wachtwoord ingesteld — het dashboard vraagt er vanaf nu om');
+      return sendJson(res, 201, { ok: true, naar: '/dashboard' });
+    }
+
+    if (pathname === '/api/auth/login' && req.method === 'POST') {
+      const verdict = security.alleenHerkomst(req);
+      if (!verdict.ok) return sendJson(res, verdict.status, { error: verdict.error });
+      if (!security.loginPogingOk()) {
+        return sendJson(res, 429, { error: 'Te veel pogingen. Wacht vijf minuten.' });
+      }
+      if (!heeftWachtwoord()) {
+        return sendJson(res, 409, { error: 'Er is nog geen wachtwoord ingesteld.', naar: '/login' });
+      }
+      const body = await readBody(req);
+      if (!controleerWachtwoord(String(body.wachtwoord ?? ''))) {
+        security.loginMislukt();
+        return sendJson(res, 401, { error: 'Dat wachtwoord klopt niet.' });
+      }
+      security.loginGelukt();
+      security.vernieuwSessie();
+      security.setCookie(res);
+      return sendJson(res, 200, { ok: true, naar: '/dashboard' });
+    }
+
+    if (pathname === '/api/auth/logout' && req.method === 'POST') {
+      const verdict = security.alleenHerkomst(req);
+      if (!verdict.ok) return sendJson(res, verdict.status, { error: verdict.error });
+      security.vernieuwSessie();
+      res.setHeader('Set-Cookie', `${security.cookieName}=; Path=/; HttpOnly; SameSite=Strict; Max-Age=0`);
+      return sendJson(res, 200, { ok: true, naar: '/login' });
     }
 
     if (pathname.startsWith('/api/') || pathname.startsWith('/_api/')) {
@@ -1075,6 +1125,75 @@ const server = createServer(async (req, res) => {
           secties: p.secties,
         })),
       });
+    }
+
+    /* ── wachtwoord wijzigen ──────────────────────────────────────────────
+       Achter de sessie-eis: alleen wie al binnen is mag dit. Het oude
+       wachtwoord moet kloppen, anders kan een openstaande sessie de eigenaar
+       buitensluiten. */
+
+    if (pathname === '/api/auth/wachtwoord' && req.method === 'POST') {
+      if (!security.loginPogingOk()) {
+        return sendJson(res, 429, { error: 'Te veel pogingen. Wacht vijf minuten.' });
+      }
+      const body = await readBody(req);
+      try {
+        zetWachtwoord(String(body.nieuw ?? ''), { oud: String(body.oud ?? '') });
+      } catch (fout) {
+        security.loginMislukt();
+        return sendJson(res, 400, { error: fout.message });
+      }
+      security.loginGelukt();
+      security.vernieuwSessie();
+      security.setCookie(res);
+      return sendJson(res, 200, { ok: true });
+    }
+
+    /* ── Gmail koppelen ───────────────────────────────────────────────────
+       De inloggegevens komen uit het scherm, worden eerst bij Gmail getest en
+       pas daarna bewaard. Ze gaan nooit terug naar de browser. */
+
+    if (pathname === '/api/gmail' && req.method === 'GET') {
+      const sleutels = vindGmailSleutels();
+      return sendJson(res, 200, {
+        gekoppeld: Boolean(sleutels),
+        gebruiker: sleutels?.gebruiker ?? null,
+        bron: sleutels?.bron ?? null,
+      });
+    }
+
+    if (pathname === '/api/gmail/koppel' && req.method === 'POST') {
+      if (!security.rateLimitOk({ emmer: 'mail', limiet: 20 })) {
+        return sendJson(res, 429, { error: 'Te veel pogingen. Even wachten.' });
+      }
+      const body = await readBody(req);
+      const gebruiker = String(body.gebruiker ?? '').trim();
+      const wachtwoord = String(body.wachtwoord ?? '').replace(/\s+/g, '');
+
+      try {
+        // Eerst kijken of Gmail deze combinatie accepteert. Opslaan wat niet
+        // werkt is erger dan een foutmelding.
+        await controleerGmailLogin({ gebruiker, wachtwoord });
+      } catch (fout) {
+        const bericht = /535|534|530/.test(fout.message)
+          ? 'Gmail weigerde deze combinatie. Controleer het app-wachtwoord (en of tweestapsverificatie aan staat).'
+          : `Kon niet inloggen bij Gmail: ${fout.message}`;
+        return sendJson(res, 400, { error: bericht });
+      }
+
+      try {
+        bewaarGmailSleutels({ gebruiker, wachtwoord });
+      } catch (fout) {
+        return sendJson(res, 400, { error: fout.message });
+      }
+
+      console.log(`  Gmail gekoppeld als ${gebruiker}`);
+      return sendJson(res, 200, { gekoppeld: true, gebruiker });
+    }
+
+    if (pathname === '/api/gmail/ontkoppel' && req.method === 'POST') {
+      verwijderGmailSleutels();
+      return sendJson(res, 200, { gekoppeld: false });
     }
 
     /* ── stagebot ─────────────────────────────────────────────────────────

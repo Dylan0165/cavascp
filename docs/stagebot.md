@@ -127,26 +127,28 @@ Regel het met je stagecoördinator vóór je verstuurt.
 ## Gmail koppelen
 
 De stagebot verstuurt via de SMTP-server van Gmail, met een **app-wachtwoord**.
-Geen OAuth, geen Google Cloud-project: één string van zestien tekens die je in
-`.env` zet en die je met één klik kunt intrekken.
+Geen OAuth, geen Google Cloud-project: één string van zestien tekens die je met
+één klik kunt intrekken.
 
 1. Zet **tweestapsverificatie** aan op je Google-account. Zonder dat bestaat er
    geen app-wachtwoord.
 2. Ga naar <https://myaccount.google.com/apppasswords>, noem het "stagebot" en
    kopieer de zestien tekens.
-3. Zet ze in `.env`:
+3. Open het stage-scherm, klik rechtsboven op **Gmail: niet gekoppeld**, vul je
+   adres en het app-wachtwoord in en druk op **Koppelen**.
 
-   ```
-   GMAIL_USER=dylanschuurman04@gmail.com
-   GMAIL_APP_PASSWORD=abcd efgh ijkl mnop
-   ```
+De server logt dan echt in bij Gmail om de combinatie te controleren. Klopt er
+iets niet, dan krijg je dat meteen te zien — niet pas als je twintig mails wilt
+versturen. Het wachtwoord wordt bewaard in `data/stagebot/gmail.json` (chmod 600)
+en gaat nooit terug naar de browser: het scherm laat alleen zien dát het
+gekoppeld is en met welk adres.
 
-   Spaties mogen; die haalt de code eruit.
-4. Test met een proefmail naar jezelf:
+Liever met de hand? Het kan ook in `.env` (`GMAIL_USER`, `GMAIL_APP_PASSWORD`);
+dat bestand wordt als tweede gelezen. En testen zonder scherm:
 
-   ```
-   node stagebot/cli.mjs gmail --test
-   ```
+```
+node stagebot/cli.mjs gmail --test
+```
 
 Daarna wordt de knop **Verstuur naar …** actief in het scherm, en verschijnt
 **Verstuur goedgekeurd (n)** zodra er mails op goedgekeurd staan.

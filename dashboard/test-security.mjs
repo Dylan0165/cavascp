@@ -18,6 +18,8 @@
 
 import { createConnection } from 'node:net';
 import { spawn } from 'node:child_process';
+import { mkdtempSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 
@@ -28,10 +30,15 @@ const BASE = `http://127.0.0.1:${PORT}`;
 /* Zonder CAVASCP_PORT zoeken we een eigen server, op een eigen poort. */
 let eigenServer = null;
 if (!process.env.CAVASCP_PORT) {
+  const authBestand = path.join(
+    mkdtempSync(path.join(tmpdir(), 'cavascp-auth-')),
+    'auth.json',
+  );
+
   eigenServer = spawn(process.execPath, ['server.mjs', '--port', String(PORT)], {
     cwd: HIER,
     stdio: 'ignore',
-    env: { ...process.env, CAVASCP_PORT: String(PORT) },
+    env: { ...process.env, CAVASCP_PORT: String(PORT), CAVASCP_AUTH_FILE: authBestand },
   });
   procesOpruimen(eigenServer);
 
@@ -168,10 +175,27 @@ console.log('\n5) Een verzonnen sessiesleutel');
 console.log('\n6) Het dashboard met een geldige sessie');
 let sessionCookie = null;
 {
-  // De bootstrappagina zet de cookie; daarna werken de routes.
-  const boot = await raw('/');
-  check('bootstrappagina bereikbaar', boot.status === 200, `status ${boot.status}`);
-  const setCookie = boot.headers.get('set-cookie') ?? '';
+  /*
+   * Sinds het dashboard op Tailscale bereikbaar is, geeft de startpagina geen
+   * cookie meer weg: je moet eerst een wachtwoord instellen en inloggen. Dat
+   * is precies wat hier gecontroleerd wordt — de oude test ging ervan uit dat
+   * een bezoek aan / genoeg was.
+   */
+  const login = await fetch(BASE + '/api/auth/login', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Origin: BASE },
+    body: JSON.stringify({ wachtwoord: 'Test-wachtwoord-123' }),
+  });
+  check('inloggen zonder ingesteld wachtwoord wordt geweigerd', login.status === 409, `status ${login.status}`);
+
+  const setup = await fetch(BASE + '/api/auth/setup', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Origin: BASE },
+    body: JSON.stringify({ wachtwoord: 'Test-wachtwoord-123' }),
+  });
+  check('wachtwoord instellen geeft een sessie', setup.status === 201, `status ${setup.status}`);
+
+  const setCookie = setup.headers.get('set-cookie') ?? '';
   check('sessiecookie gezet', setCookie.includes('cavascp_session='), setCookie.slice(0, 40) + '…');
   check('cookie is HttpOnly', /HttpOnly/i.test(setCookie));
   check('cookie is SameSite=Strict', /SameSite=Strict/i.test(setCookie));

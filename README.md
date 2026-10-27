@@ -158,14 +158,27 @@ Die test start zijn eigen server op poort 8799. Nodig, want het draaiende
 dashboard luistert op het Tailscale-adres en heeft de hostcontrole uitstaan —
 juist die controle wordt hier getest.
 
-### Hoe het werkt in de praktijk
+### Inloggen
 
-Je opent `http://127.0.0.1:8787`. Die pagina zet de sessiesleutel en stuurt je
-door naar het dashboard. Daarna werkt alles zoals eerst — je merkt er niets van.
-Open je een oude link zonder sleutel, dan zegt de server wat je moet doen.
+Sinds het dashboard op Tailscale bereikbaar is, zit er een wachtwoord voor. Zonder
+dat zou iedereen die bij je Tailscale-account kan meteen in je portfolio, je
+documenten en je Gmail-koppeling zitten.
 
-De sleutel wordt **per keer dat de server start** opnieuw gemaakt. Herstart je
-het dashboard, dan is een oud tabblad uitgelogd; even herladen is genoeg.
+De eerste keer dat je de pagina opent, vraag je om een wachtwoord in te stellen
+(minimaal 12 tekens, met letters én cijfers of leestekens). Daarna log je in.
+
+| Wat | Waar |
+|---|---|
+| Het wachtwoord zelf | nergens — er staat alleen een scrypt-hash in `dashboard/auth.json` (chmod 600) |
+| De sessie | HttpOnly-cookie met `SameSite=Strict`, per serverstart opnieuw gemaakt |
+| Uitloggen | knop rechtsboven; de oude cookie is daarna waardeloos |
+| Te veel pogingen | na tien mislukte pogingen in vijf minuten word je vijf minuten tegengehouden |
+
+Het wachtwoord staat los van het Gmail-app-wachtwoord. Dat tweede vul je in het
+stage-scherm in en het wordt alleen gebruikt om te mailen.
+
+**Belangrijk:** zolang er nog geen wachtwoord is ingesteld, kan iedereen die de
+link heeft het instellen. Doe dat dus meteen na de eerste keer openen.
 
 ## Wat het wel en niet kan
 

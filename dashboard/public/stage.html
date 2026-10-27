@@ -78,6 +78,30 @@
 
   .acties { display: flex; gap: .5rem; flex-wrap: wrap; margin-top: 1rem; }
   .leeg { color: var(--ink-3); font-size: var(--text-sm); margin: 0; }
+
+  .quota--knop {
+    background: none; border: 0; padding: .25rem .375rem; border-radius: .375rem;
+    cursor: pointer; font: inherit;
+  }
+  .quota--knop:hover { background: var(--bg-deep); }
+
+  .dialoog {
+    width: min(30rem, calc(100vw - 2rem)); border: 1px solid var(--line);
+    border-radius: .75rem; background: var(--panel, var(--bg-deep)); color: var(--ink);
+    padding: 1.25rem 1.375rem 1.375rem;
+  }
+  .dialoog::backdrop { background: rgb(0 0 0 / .55); }
+  .dialoog h2 { margin: 0 0 .5rem; font-family: var(--font-display); font-size: var(--text-lg); }
+  .dialoog__uitleg { color: var(--ink-3); font-size: var(--text-sm); line-height: 1.55; margin: 0 0 1rem; }
+  .dialoog a { color: var(--green-400); }
+  .dialoog label { display: block; font-size: var(--text-xs); color: var(--ink-2); margin-bottom: .25rem; }
+  .dialoog input {
+    width: 100%; margin-bottom: .75rem; padding: .5rem .625rem;
+    background: var(--bg); color: var(--ink); border: 1px solid var(--line);
+    border-radius: .375rem; font: inherit;
+  }
+  .dialoog input:focus-visible { outline: 2px solid var(--green-500); outline-offset: 1px; }
+  .dialoog__fout { color: var(--clay-400); font-size: var(--text-sm); min-height: 1.2rem; margin: .25rem 0 .75rem; }
   .voortgang { font-size: var(--text-sm); color: var(--ink-2); font-family: var(--font-mono); }
 </style>
 </head>
@@ -93,7 +117,8 @@
   </div>
   <div class="topbar__right">
     <span class="quota" id="quota">—</span>
-    <span class="quota" id="gmail" title="Waar de mails vandaan gaan">Gmail: —</span>
+    <button class="quota quota--knop" id="gmail" type="button" title="Gmail koppelen of ontkoppelen">Gmail: —</button>
+    <button id="logout" class="btn btn--ghost" type="button" title="Sessie beëindigen">Uitloggen</button>
     <button id="theme" class="btn btn--icon" type="button" title="Wissel licht/donker" aria-label="Wissel licht/donker thema">◐</button>
   </div>
 </header>
@@ -131,6 +156,32 @@
   </div>
 
 </main>
+
+<dialog id="gmail-dialoog" class="dialoog">
+  <form id="gmail-vorm" autocomplete="off">
+    <h2 id="gmail-titel">Gmail koppelen</h2>
+    <p class="dialoog__uitleg" id="gmail-uitleg">
+      De stagebot verstuurt via jouw Gmail met een app-wachtwoord. Dat maak je op
+      <a href="https://myaccount.google.com/apppasswords" target="_blank" rel="noreferrer noopener">myaccount.google.com/apppasswords</a>
+      (tweestapsverificatie moet aan staan). Het wachtwoord gaat naar deze machine,
+      niet naar buiten — en je kunt het daar met één klik intrekken.
+    </p>
+
+    <label for="gmail-gebruiker">E-mailadres</label>
+    <input id="gmail-gebruiker" type="email" inputmode="email" required>
+
+    <label for="gmail-wachtwoord">App-wachtwoord</label>
+    <input id="gmail-wachtwoord" type="password" placeholder="abcd efgh ijkl mnop" required>
+
+    <p class="dialoog__fout" id="gmail-fout" role="alert"></p>
+
+    <div class="acties">
+      <button type="submit" class="btn" id="gmail-koppel">Koppelen</button>
+      <button type="button" class="btn btn--ghost" id="gmail-ontkoppel" hidden>Ontkoppelen</button>
+      <button type="button" class="btn btn--ghost" id="gmail-sluit">Sluiten</button>
+    </div>
+  </form>
+</dialog>
 
 <script src="/stage.js" type="module"></script>
 </body>

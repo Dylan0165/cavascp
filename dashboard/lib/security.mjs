@@ -40,11 +40,13 @@ const LOCAL_HOSTS = new Set(['localhost', '127.0.0.1', '[::1]', '::1']);
  * @param {number} [options.rateLimit]     dure acties per minuut
  */
 export function createSecurity({ port, allowRemote = false, rateLimit = 10 } = {}) {
-  const sessionToken = randomBytes(32).toString('base64url');
+  /*
+   * Het sessietoken is muteerbaar: bij inloggen en uitloggen maken we een
+   * nieuwe. Een oude cookie is daarmee in één keer waardeloos — belangrijker
+   * dan een aflopende datum, want er is maar één token voor de hele server.
+   */
+  let sessionToken = randomBytes(32).toString('base64url');
   const cookieName = 'cavascp_session';
-
-  /** Alleen het eerste stukje van het token tonen, om te kunnen vergelijken. */
-  const fingerprint = sessionToken.slice(0, 8);
 
   /**
    * Telt dure acties per minuut, per emmer.
@@ -152,6 +154,68 @@ export function createSecurity({ port, allowRemote = false, rateLimit = 10 } = {
    * Controleert een API-request.
    * @returns {{ok: true} | {ok: false, status: number, error: string, hint?: string}}
    */
+  /**
+   * Alleen host en herkomst controleren, zonder sessie.
+   *
+   * Nodig voor de loginpagina zelf: die moet werken zonder cookie, maar wel
+   * alleen vanaf deze machine en alleen vanaf onze eigen pagina.
+   */
+  function alleenHerkomst(req) {
+    if (!hostAllowed(req)) {
+      return {
+        ok: false,
+        status: 421,
+        error: 'Deze server accepteert alleen verbindingen vanaf deze machine.',
+        hint: 'Start met --allow-remote als je hem bewust via een tunnel bereikbaar wilt maken.',
+      };
+    }
+    if (!originAllowed(req)) {
+      return {
+        ok: false,
+        status: 403,
+        error: 'Verzoek geweigerd: het komt niet uit het dashboard zelf.',
+        hint: 'Open het dashboard via http://127.0.0.1:' + port,
+      };
+    }
+    return { ok: true };
+  }
+
+  /**
+   * Een nieuwe sessiesleutel. Bij inloggen: de oude cookie sterft.
+   */
+  function vernieuwSessie() {
+    sessionToken = randomBytes(32).toString('base64url');
+    return sessionToken;
+  }
+
+  /**
+   * De rem op inlogpogingen.
+   *
+   * Tien per vijf minuten. Ruim genoeg om een wachtwoord drie keer verkeerd te
+   * typen, krap genoeg om raden zinloos te maken.
+   */
+  const loginPogingen = [];
+
+  /*
+   * Alleen mislukte pogingen tellen. Anders zou je jezelf na een paar keer
+   * inloggen — laptop, telefoon, een herlaadbeurt — buiten sluiten zonder dat
+   * er iemand aan het raden is.
+   */
+  function loginPogingOk() {
+    const nu = Date.now();
+    while (loginPogingen.length && nu - loginPogingen[0] > 5 * 60_000) loginPogingen.shift();
+    if (loginPogingen.length >= 10) return false;
+    return true;
+  }
+
+  function loginMislukt() {
+    loginPogingen.push(Date.now());
+  }
+
+  function loginGelukt() {
+    loginPogingen.length = 0;
+  }
+
   function check(req) {
     if (!hostAllowed(req)) {
       return {
@@ -193,13 +257,25 @@ export function createSecurity({ port, allowRemote = false, rateLimit = 10 } = {
   }
 
   return {
-    sessionToken,
     cookieName,
-    fingerprint,
     check,
     rateLimitOk,
     noteRateLimit,
     allowRemote,
+    alleenHerkomst,
+    vernieuwSessie,
+    loginPogingOk,
+    loginMislukt,
+    loginGelukt,
+
+    /** Alleen het eerste stukje van het token tonen, om te kunnen vergelijken. */
+    get fingerprint() {
+      return sessionToken.slice(0, 8);
+    },
+
+    get sessionToken() {
+      return sessionToken;
+    },
 
     /**
      * Beveiligingsheaders. Deze gelden voor elke response.

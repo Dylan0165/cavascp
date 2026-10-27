@@ -35,9 +35,9 @@
 
 import tls from 'node:tls';
 import net from 'node:net';
-import { existsSync, readFileSync, statSync } from 'node:fs';
+import { existsSync, readFileSync, writeFileSync, mkdirSync, chmodSync, rmSync, statSync } from 'node:fs';
+import { inData, inProject, vindEnv } from '../../mcp/lib/paden.mjs';
 import path from 'node:path';
-import { inProject, vindEnv } from '../../mcp/lib/paden.mjs';
 
 const SMTP_HOST = process.env.GMAIL_SMTP_HOST || 'smtp.gmail.com';
 const SMTP_POORT = Number(process.env.GMAIL_SMTP_PORT || 465);
@@ -52,7 +52,27 @@ const TIMEOUT_MS = 45_000;
  */
 export function vindGmailSleutels() {
   /*
-   * Eerst de omgeving. Handig voor een test die een nepserver gebruikt, en
+   * Eerst de koppeling die je in het scherm hebt gelegd. Die is het meest
+   * recent en het minst foutgevoelig (geen handmatig bewerken van .env).
+   */
+  if (existsSync(KOPPEL_PAD)) {
+    try {
+      const data = JSON.parse(readFileSync(KOPPEL_PAD, 'utf8'));
+      if (data.gebruiker && data.wachtwoord) {
+        return {
+          gebruiker: data.gebruiker,
+          wachtwoord: data.wachtwoord,
+          bron: 'het scherm',
+          alleenLeesbaarVoorJou: (statSync(KOPPEL_PAD).mode & 0o077) === 0,
+        };
+      }
+    } catch {
+      /* stuk bestand: val terug op .env */
+    }
+  }
+
+  /*
+   * En de omgeving. Handig voor een test die een nepserver gebruikt, en
    * voor een machine waar de sleutel via systemd wordt meegegeven in plaats
    * van in een bestand te staan.
    */
@@ -98,6 +118,75 @@ export function vindGmailSleutels() {
 
 export function gmailBeschikbaar() {
   return vindGmailSleutels() !== null;
+}
+
+/* ─────────────────────────── opslag van de koppeling ───────────────────── */
+
+const KOPPEL_PAD = inData('stagebot', 'gmail.json');
+
+/**
+ * Bewaart de koppeling in data/stagebot/gmail.json (alleen leesbaar voor jou).
+ *
+ * Waarom niet in .env: dat bestand wordt met de hand bewerkt en door meer
+ * onderdelen gelezen. Een apart bestand kan de UI veilig herschrijven zonder
+ * dat er per ongeluk iets anders in .env sneuvelt.
+ */
+export function bewaarGmailSleutels({ gebruiker, wachtwoord }) {
+  const schoon = {
+    gebruiker: String(gebruiker ?? '').trim(),
+    wachtwoord: String(wachtwoord ?? '').replace(/\s+/g, ''),
+  };
+  if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(schoon.gebruiker)) {
+    throw new Error('Dat lijkt geen e-mailadres.');
+  }
+  if (schoon.wachtwoord.length < 8) {
+    throw new Error('Een app-wachtwoord is langer dan dit. Kopieer hem opnieuw.');
+  }
+
+  mkdirSync(path.dirname(KOPPEL_PAD), { recursive: true });
+  writeFileSync(
+    KOPPEL_PAD,
+    JSON.stringify({ versie: 1, ...schoon, gekoppeld: new Date().toISOString() }, null, 2),
+    { encoding: 'utf8', mode: 0o600 },
+  );
+  try {
+    chmodSync(KOPPEL_PAD, 0o600);
+  } catch {
+    /* niet elk bestandssysteem doet dit */
+  }
+  return { gebruiker: schoon.gebruiker };
+}
+
+export function verwijderGmailSleutels() {
+  if (existsSync(KOPPEL_PAD)) rmSync(KOPPEL_PAD);
+}
+
+/**
+ * Controleert de inloggegevens zonder een mail te versturen.
+ *
+ * Dit is wat de knop "koppelen" doet: pas als Gmail de combinatie accepteert,
+ * slaan we hem op. Zo kom je er niet een dag later achter dat het wachtwoord
+ * niet klopte toen je twintig mails wilde versturen.
+ */
+export async function controleerGmailLogin({ gebruiker, wachtwoord, host, port, secure }) {
+  const { socket, commando } = await openVerbinding({
+    host: host ?? SMTP_HOST,
+    port: port ?? SMTP_POORT,
+    secure: secure ?? (port ?? SMTP_POORT) === 465,
+  });
+
+  try {
+    await commando('EHLO stagebot', [250]);
+    const auth = await commando('AUTH LOGIN', [334, 235]);
+    if (auth.code === 334) {
+      await commando(Buffer.from(gebruiker, 'utf8').toString('base64'), [334]);
+      await commando(Buffer.from(wachtwoord, 'utf8').toString('base64'), [235]);
+    }
+    await commando('QUIT', [221, 250]);
+    return { ok: true };
+  } finally {
+    socket.end();
+  }
 }
 
 /* ─────────────────────────────── MIME ─────────────────────────────────── */
