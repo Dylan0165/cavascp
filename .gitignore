@@ -21,6 +21,12 @@ dashboard/documents.json
 # Schermafbeeldingen van je eigen portfolio: alleen voor lokaal gebruik.
 dashboard/preview/
 
+# Superdesign: de tijdelijke map nooit committen (de skill eist dit).
+# .superdesign/init/ en design-system.md bevatten alleen ontwerpcontext en
+# mogen wel mee.
+.superdesign/tmp/
+.superdesign/website/
+
 # Het browserprofiel bevat je ingelogde Fontys-sessie: net zo gevoelig als een
 # wachtwoord. Nooit in versiebeheer.
 browser/.chrome-profile/
@@ -38,3 +44,21 @@ __pycache__/
 # Tijdelijk
 *.tmp
 *.log
+data/tijdelijk/
+
+# Cursusmateriaal van Fontys: auteursrechtelijk materiaal en te groot voor een
+# publieke repo. Hoort lokaal te blijven.
+docs/stage/
+
+# Alles wat uit je eigen Canvas- en Portflow-account komt. Hier staan je
+# cursusnamen, mededelingen, leeruitkomsten en je portfolio-id's in. Dat is
+# persoonlijk en hoort niet op GitHub.
+data/canvas-state.json
+data/course-intel.json
+data/leeruitkomsten.json
+data/lo-koppeling.json
+data/documenten/
+
+# De stagebot houdt bij welke bedrijven je hebt benaderd en wat ze antwoordden.
+# Dat is een zakelijk dossier, geen openbaar bestand.
+data/stagebot/

@@ -192,7 +192,17 @@ export class Portflow {
    * @param {string} [options.name]     titel van het bewijsstuk
    * @param {number[]} [options.goalIds]  optioneel: leeruitkomsten koppelen
    */
-  async addFileEvidence({ filePath, collectionIds = [], goalIds = [], name, quiet = false }) {
+  /**
+   * Zet een bestand als bewijsstuk in één of meer mappen.
+   *
+   * @param {object} opties
+   * @param {string} opties.filePath
+   * @param {number[]} [opties.collectionIds]  mappen waar het in moet
+   * @param {number[]} [opties.goalIds]        leeruitkomsten; meerdere mag
+   * @param {string} [opties.name]             titel in Portflow
+   * @param {string} [opties.description]      toelichting bij het bewijsstuk
+   */
+  async addFileEvidence({ filePath, collectionIds = [], goalIds = [], name, description = '', quiet = false }) {
     const { readFile } = await import('node:fs/promises');
     const { createHash } = await import('node:crypto');
     const nodePath = await import('node:path');
@@ -239,6 +249,7 @@ export class Portflow {
       activity_ids: [],
       version_type: 'file',
       name: title,
+      ...(description ? { description } : {}),
     });
     if (!create.ok) {
       throw new Error(
@@ -246,11 +257,14 @@ export class Portflow {
       );
     }
 
+    const evidenceId = create.data?.id ?? null;
     if (!quiet) {
-      console.log(`    geüpload: "${title}" -> evidence ${create.data?.id}`);
+      console.log(`    geüpload: "${title}" -> evidence ${evidenceId}`);
     }
-    return { evidenceId: create.data?.id ?? null, name: title, size: bytes.length, data: create.data };
+    return { evidenceId, id: evidenceId, name: title, size: bytes.length, data: create.data };
   }
+
+  /* ──────────────────── schrijven: beschrijvingen ──────────────────────── */
 
   /** Verwijdert een bewijsstuk. Geeft de HTTP-status terug. */
   async deleteEvidence(evidenceId) {
@@ -259,6 +273,291 @@ export class Portflow {
       `/api/v1/portfolios/${this.portfolioId}/evidence/${evidenceId}`,
     );
     return res.status;
+  }
+
+  /**
+   * Zet de beschrijving van een map — dit is de leeswijzer voor de docent.
+   *
+   * Portflow accepteert PATCH en PUT op de collectie en antwoordt met 204.
+   */
+  async setCollectionDescription(collectionId, description) {
+    const res = await this.call('PATCH', `/api/v1/portfolios/${this.portfolioId}/collections/${collectionId}`, {
+      description: description ?? '',
+    });
+    if (res.status !== 204 && res.status !== 200) {
+      throw new Error(
+        `beschrijving zetten mislukt (${res.status}): ${JSON.stringify(res.data ?? res.textPreview).slice(0, 240)}`,
+      );
+    }
+    return { ok: true, collectionId, length: (description ?? '').length };
+  }
+
+  /** De ondertitel van een map. */
+  async setCollectionSubtitle(collectionId, subtitle) {
+    const res = await this.call('PATCH', `/api/v1/portfolios/${this.portfolioId}/collections/${collectionId}`, {
+      subtitle: subtitle ?? '',
+    });
+    if (res.status !== 204 && res.status !== 200) {
+      throw new Error(`ondertitel zetten mislukt (${res.status}): ${res.textPreview?.slice(0, 200)}`);
+    }
+    return { ok: true, collectionId };
+  }
+
+  /** De toelichting bij één bewijsstuk. */
+  async setEvidenceDescription(evidenceId, description) {
+    const res = await this.call('PATCH', `/api/v1/portfolios/${this.portfolioId}/evidence/${evidenceId}`, {
+      description: description ?? '',
+    });
+    if (res.status !== 204 && res.status !== 200) {
+      throw new Error(
+        `toelichting zetten mislukt (${res.status}): ${JSON.stringify(res.data ?? res.textPreview).slice(0, 240)}`,
+      );
+    }
+    return { ok: true, evidenceId, length: (description ?? '').length };
+  }
+
+  /** Welke leeruitkomsten hangen er aan dit bewijsstuk? */
+  async evidenceGoals(evidenceId) {
+    const res = await this.call('GET', `/api/v1/portfolios/${this.portfolioId}/evidence/${evidenceId}/goals`);
+    if (!res.ok) throw new Error(`doelen ophalen mislukt (${res.status})`);
+    const lijst = Array.isArray(res.data) ? res.data : [];
+    return lijst.map((g) => ({ id: g.id, name: g.name ?? g.nickname ?? String(g.id) }));
+  }
+
+  /**
+   * Koppelt een bewijsstuk aan leeruitkomsten.
+   *
+   * LET OP: dit VERVANGT de bestaande koppelingen, het vult niet aan. Geef dus
+   * altijd de volledige lijst mee. Wil je er één bijzetten, haal dan eerst de
+   * huidige set op met evidenceGoals() en voeg toe.
+   */
+  async setEvidenceGoals(evidenceId, goalIds = []) {
+    const res = await this.call('PATCH', `/api/v1/portfolios/${this.portfolioId}/evidence/${evidenceId}`, {
+      goal_ids: goalIds,
+    });
+    if (res.status !== 204 && res.status !== 200) {
+      throw new Error(
+        `doelen koppelen mislukt (${res.status}): ${JSON.stringify(res.data ?? res.textPreview).slice(0, 240)}`,
+      );
+    }
+    return { ok: true, evidenceId, goalIds };
+  }
+
+  /** Zet er één leeruitkomst bij, zonder de bestaande te verliezen. */
+  async addEvidenceGoal(evidenceId, goalId) {
+    const huidig = await this.evidenceGoals(evidenceId);
+    const ids = new Set(huidig.map((g) => g.id));
+    if (ids.has(goalId)) return { ok: true, evidenceId, goalIds: [...ids], alAanwezig: true };
+    ids.add(goalId);
+    const resultaat = await this.setEvidenceGoals(evidenceId, [...ids]);
+    return { ...resultaat, alAanwezig: false };
+  }
+
+  /** De mappen waar dit bewijsstuk in zit. */
+  async evidenceCollections(evidenceId) {
+    const res = await this.call('GET', `/api/v1/portfolios/${this.portfolioId}/evidence/${evidenceId}/collections`);
+    if (!res.ok) throw new Error(`mappen ophalen mislukt (${res.status})`);
+    const lijst = Array.isArray(res.data) ? res.data : [];
+    return lijst.map((c) => ({ id: c.id, name: c.name }));
+  }
+
+  /* ───────────────────── snapshots (portfolio-freezes) ─────────────────── */
+
+  /**
+   * Alle snapshots van dit portfolio.
+   *
+   * LET OP het pad: `/api/v1/frozen-portfolios`, ZONDER portfolio-id erin. Dat
+   * is gevonden door de pagina "My snapshots" te openen en het verkeer vast te
+   * leggen; het staat niet in de JS-bundel en raden levert 404 op.
+   */
+  async snapshots({ page = 1, perPage = 50 } = {}) {
+    const res = await this.call('GET', `/api/v1/frozen-portfolios?page=${page}&per_page=${perPage}`);
+    if (!res.ok) throw new Error(`snapshots ophalen mislukt (${res.status})`);
+    const data = res.data;
+    const lijst = Array.isArray(data) ? data : (data?.data ?? data?.frozen_portfolios ?? []);
+    return lijst.map((f) => ({
+      id: f.id,
+      naam: f.name,
+      versie: f.version_number ?? null,
+      gemaakt: f.created_at ?? null,
+      bijgewerkt: f.updated_at ?? null,
+      code: f.snapshot_code ?? null,
+      showcaseUrl: f.showcase_url ?? null,
+      assessmentUrl: f.assessment_url ?? null,
+      inleveringen: Array.isArray(f.lms_assignments) ? f.lms_assignments.length : 0,
+      lmsAssignments: f.lms_assignments ?? [],
+      bio: f.bio ?? null,
+      ruw: f,
+    }));
+  }
+
+  /** Eén snapshot. */
+  async snapshot(id) {
+    const alle = await this.snapshots({ perPage: 100 });
+    const gevonden = alle.find((s) => Number(s.id) === Number(id));
+    if (!gevonden) throw new Error(`snapshot ${id} niet gevonden`);
+    return gevonden;
+  }
+
+  /** Een snapshot verwijderen. Geeft de HTTP-status terug. */
+  async deleteSnapshot(id) {
+    const res = await this.call('DELETE', `/api/v1/frozen-portfolios/${id}`);
+    return res.status;
+  }
+
+  /**
+   * Welk bewijs zit er in een map? Nodig om een snapshot op te bouwen.
+   *
+   * Dit gebruikt het portfolio-freezes-endpoint, het enige dat bewijs MET zijn
+   * doelen teruggeeft. Het gewone collectie-endpoint geeft alleen de stukken.
+   */
+  async evidenceForFreeze(collectionId, { perPage = 200 } = {}) {
+    const res = await this.call(
+      'GET',
+      `/api/v1/portfolios/${this.portfolioId}/portfolio-freezes/collections/${collectionId}/evidence?page=1&per_page=${perPage}`,
+    );
+    if (!res.ok) throw new Error(`bewijs ophalen voor map ${collectionId} mislukt (${res.status})`);
+    const lijst = Array.isArray(res.data) ? res.data : [];
+    return lijst.map((item) => {
+      const ev = item.evidence ?? item;
+      return {
+        id: ev.id,
+        naam: ev.name,
+        goalIds: (ev.goals ?? []).map((g) => g.id ?? g).filter((n) => Number.isFinite(Number(n))),
+      };
+    });
+  }
+
+  /**
+   * Een snapshot maken.
+   *
+   * De vijf stappen uit de modal, in één aanroep. De body is precies zoals de
+   * app hem stuurt — dat is afgekeken van het echte verkeer, niet geraden:
+   *
+   *   {
+   *     name, type: 'goal',
+   *     goal_ids: [...],
+   *     sections: [...],
+   *     collection_evidence: [{ collection_id, evidence_ids: [...] }]
+   *   }
+   *
+   * Na het aanmaken duurt het even voordat hij klaar is; Portflow zegt zelf
+   * "being finalized". Gebruik wachtOpSnapshot() om te wachten tot hij in de
+   * lijst staat.
+   */
+  async maakSnapshot({
+    naam,
+    collectionIds = [],
+    goalIds = [],
+    sections = [],
+    type = 'goal',
+    alleenDezeMappen = true,
+    quiet = false,
+  }) {
+    if (!naam) throw new Error('een snapshot heeft een naam nodig');
+    if (!collectionIds.length) throw new Error('geen mappen opgegeven');
+
+    /* Per map het bewijs ophalen. */
+    const collectionEvidence = [];
+    for (const cid of collectionIds) {
+      const bewijs = await this.evidenceForFreeze(cid);
+      collectionEvidence.push({
+        collection_id: Number(cid),
+        evidence_ids: bewijs.map((b) => Number(b.id)),
+      });
+      if (!quiet) console.log(`    map ${cid}: ${bewijs.length} bewijsstukken`);
+    }
+
+    /*
+     * De mappen die NIET meegaan. De app stuurt dit mee in `sections`, met
+     * `excepted_collection_ids`. Zonder deze lijst zou een snapshot van het
+     * hele portfolio gemaakt worden in plaats van alleen de gekozen mappen.
+     */
+    let secties = sections;
+    if (!secties.length) {
+      const alleMappen = await this.collections();
+      const gekozen = new Set(collectionIds.map(Number));
+      const overige = alleMappen
+        .filter((m) => !gekozen.has(Number(m.id)) && m.section_id)
+        .map((m) => Number(m.id));
+      const perSectie = new Map();
+      for (const m of alleMappen) {
+        if (!m.section_id || gekozen.has(Number(m.id))) continue;
+        if (!perSectie.has(m.section_id)) perSectie.set(m.section_id, []);
+        perSectie.get(m.section_id).push(Number(m.id));
+      }
+      secties = [...perSectie.entries()].map(([id, ids], i) => ({
+        id,
+        selected: false,
+        excepted_collection_ids: ids,
+        position: i,
+      }));
+      if (alleenDezeMappen && !secties.length) {
+        // Niets uit te sluiten: dan is één lege sectie genoeg, net als de app.
+        secties = [{ selected: false, excepted_collection_ids: [] }];
+      }
+    }
+
+    const body = {
+      name: String(naam).slice(0, 100),
+      type,
+      sections: secties,
+      collection_evidence: collectionEvidence,
+      goal_ids: goalIds.map(Number).filter((n) => Number.isFinite(n)),
+    };
+
+    if (!quiet) {
+      const totaal = collectionEvidence.reduce((n, c) => n + c.evidence_ids.length, 0);
+      console.log(`    snapshot "${body.name}": ${collectionEvidence.length} mappen, ${totaal} bewijsstukken, ${body.goal_ids.length} doelen`);
+    }
+
+    const res = await this.call('POST', `/api/v1/portfolios/${this.portfolioId}/freeze`, body);
+    if (!res.ok) {
+      throw new Error(
+        `snapshot maken mislukt (${res.status}): ${JSON.stringify(res.data ?? res.textPreview).slice(0, 400)}`,
+      );
+    }
+    return { ok: true, body, antwoord: res.data ?? null };
+  }
+
+  /** De samenvatting die de modal toont voordat je opslaat. Handig als controle. */
+  async freezeSamenvatting({ collectionIds = [], goalIds = [], sections = [], type = 'goal' }) {
+    const collectionEvidence = [];
+    for (const cid of collectionIds) {
+      const bewijs = await this.evidenceForFreeze(cid);
+      collectionEvidence.push({ collection_id: Number(cid), evidence_ids: bewijs.map((b) => Number(b.id)) });
+    }
+    const res = await this.call('POST', '/api/v1/portfolios/' + this.portfolioId + '/freeze-summary', {
+      type,
+      sections,
+      collection_evidence: collectionEvidence,
+      goal_ids: goalIds.map(Number),
+    });
+    return { ok: res.ok, status: res.status, data: res.data };
+  }
+
+  /**
+   * Wacht tot een nieuwe snapshot in de lijst staat.
+   *
+   * Portflow maakt hem op de achtergrond klaar ("being finalized"), dus direct
+   * na het aanmaken is hij nog niet zichtbaar. We wachten tot er een snapshot
+   * bij staat die er eerst niet was.
+   */
+  async wachtOpSnapshot({ bekendeIds = [], timeoutMs = 120_000, intervalMs = 4000 } = {}) {
+    const begin = Date.now();
+    const bekend = new Set(bekendeIds.map(Number));
+    while (Date.now() - begin < timeoutMs) {
+      await new Promise((r) => setTimeout(r, intervalMs));
+      let alle;
+      try {
+        alle = await this.snapshots({ perPage: 100 });
+      } catch {
+        continue;
+      }
+      const nieuw = alle.find((s) => !bekend.has(Number(s.id)));
+      if (nieuw) return nieuw;
+    }
+    return null;
   }
 }
 

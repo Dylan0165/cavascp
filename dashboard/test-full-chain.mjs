@@ -26,7 +26,7 @@ const KEEP = process.argv.includes('--keep');
 
 /**
  * Het dashboard is afgeschermd. Deze test haalt eerst de sessiecookie op bij de
- * bootstrappagina en gebruikt die daarna bij elke API-call â€” precies zoals de
+ * bootstrappagina en gebruikt die daarna bij elke API-call — precies zoals de
  * browser het doet.
  */
 let sessionCookie = null;
@@ -48,7 +48,7 @@ function api(path, options = {}) {
 const results = [];
 const check = (label, ok, detail = '') => {
   results.push({ label, ok: Boolean(ok) });
-  console.log(`  ${ok ? 'PASS' : 'FAIL'}  ${label}${detail ? ` â€” ${detail}` : ''}`);
+  console.log(`  ${ok ? 'PASS' : 'FAIL'}  ${label}${detail ? ` — ${detail}` : ''}`);
 };
 
 const TEST_NAME = `cavascp ketentest ${Date.now()}`;
@@ -84,7 +84,7 @@ try {
   check('collecties opgehaald', colRes.ok && colBody.ok, `${colBody.collections?.length ?? 0} collecties`);
   const target =
     colBody.collections?.find((c) => c.evidenceCount > 0) ?? colBody.collections?.[0];
-  check('een doelcollectie gevonden', Boolean(target), target ? `${target.id} ${target.name}` : 'â€”');
+  check('een doelcollectie gevonden', Boolean(target), target ? `${target.id} ${target.name}` : '—');
 
   console.log('\n3) document naar Portflow sturen');
   const send = await api('/api/portflow/send', {
@@ -121,7 +121,7 @@ try {
     check('teruggevonden in Portflow', Boolean(found), found ? `"${found.name}"` : 'niet gevonden');
     if (found) {
       const names = (found.collections ?? []).map((c) => c.name);
-      check('staat in de juiste collectie', names.includes(target.name), names.join(', ') || 'â€”');
+      check('staat in de juiste collectie', names.includes(target.name), names.join(', ') || '—');
     }
 
     /* Het document moet nu weten waar het staat. */

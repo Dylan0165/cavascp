@@ -18,14 +18,19 @@
 
 import { createServer } from 'node:http';
 import { readFile, writeFile, mkdir, stat } from 'node:fs/promises';
-import { existsSync } from 'node:fs';
+import { existsSync, writeFileSync, rmSync } from 'node:fs';
 import path from 'node:path';
 import { spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 
 import { createCanvas, loadEnvFile } from '../mcp/lib/canvas.mjs';
 import { fetchPortfolioAssignments, buildCriterionCoverage } from '../mcp/lib/analysis.mjs';
+import { parseTermCode, currentTermCode, groupBySemester } from '../mcp/lib/semesters.mjs';
+import { kravaStatus, kravaProjectenVanSchijf, kravaProjectVanSchijf, startKrava } from '../mcp/lib/krava.mjs';
+import { projectNaarDocx } from '../mcp/lib/assemble.mjs';
+import { checkDocument, naarPortflowGoalIds, semesterMappen } from '../mcp/lib/leeruitkomsten.mjs';
 import { createDocumentStore, parseMultipart } from './lib/documents.mjs';
+import * as werkplek from './lib/documenten.mjs';
 import { createSecurity } from './lib/security.mjs';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
@@ -48,6 +53,16 @@ const ALLOW_REMOTE = args.includes('--allow-remote');
 
 const docs = createDocumentStore({ dir: DOC_DIR, indexFile: DOC_INDEX });
 const security = createSecurity({ port: PORT, allowRemote: ALLOW_REMOTE });
+
+/** Portflow-collecties veranderen zelden; een browserstart is duur. */
+let portflowCache = { at: 0, collections: null };
+const PORTFLOW_CACHE_MS = Number(process.env.CAVASCP_PORTFLOW_CACHE ?? 10 * 60 * 1000);
+
+/** De mappen met hun inhoud. Duurder dan de collectielijst, dus eigen cache. */
+let mappenCache = { at: 0, data: null };
+
+/** De snapshots. Veranderen alleen als je er een maakt of weggooit. */
+let snapshotsCache = { at: 0, data: null };
 
 /* ─────────────────────────────── state ─────────────────────────────────── */
 
@@ -99,38 +114,158 @@ async function canvasClient() {
   return { canvas: createCanvas({ baseUrl: baseUrl || 'https://fhict.instructure.com', token }) };
 }
 
+/* ─────────────────── semesters: de laag waar alles op rust ─────────────────
+   Alle cursussen door elkaar gooien maakt het onleesbaar: een criterium uit
+   2024 naast een deadline van volgende week zegt niets. Daarom krijgt elke
+   opdracht een semester, en kan de UI per semester filteren.
+   ────────────────────────────────────────────────────────────────────────── */
+
+/** Cursus-id → termcode, uit de cursusprofielen. */
+let termByCourse = new Map();
+let termProfilesAt = 0;
+const TERM_CACHE_MS = 15 * 60 * 1000;
+
+/**
+ * Haalt de termen op. Gebeurt apart van de hoofdlading, want het kost een extra
+ * ronde langs Canvas. Mislukt het, dan werkt de rest gewoon door zonder
+ * semester-indeling.
+ */
+async function refreshTerms(force = false) {
+  if (!force && termByCourse.size && Date.now() - termProfilesAt < TERM_CACHE_MS) return;
+  try {
+    const { canvas } = await canvasClient();
+    if (!canvas) return;
+    const courses = await canvas.get(
+      '/api/v1/courses',
+      { per_page: 100, 'include[]': ['term'] },
+      { paginate: true },
+    );
+    const map = new Map();
+    for (const c of Array.isArray(courses) ? courses : []) {
+      if (!c?.id) continue;
+      map.set(c.id, {
+        term: c.term?.name ?? null,
+        name: c.name,
+        code: c.course_code ?? null,
+      });
+    }
+    if (map.size) {
+      termByCourse = map;
+      termProfilesAt = Date.now();
+    }
+  } catch {
+    /* zonder termen werkt de rest ook; de UI toont dan één groep */
+  }
+}
+
 function buildPayload(assignments) {
   const now = new Date();
   const nowMs = now.getTime();
 
-  const open = assignments.filter((a) => a.state === 'unsubmitted');
-  const overdue = open.filter((a) => a.dueAt && Date.parse(a.dueAt) < nowMs);
-  const upcoming = open
-    .filter((a) => a.dueAt && Date.parse(a.dueAt) >= nowMs)
-    .sort((a, b) => Date.parse(a.dueAt) - Date.parse(b.dueAt));
-
-  const coverage = buildCriterionCoverage(assignments);
-  const gaps = coverage.filter((c) => c.evidenceCount === 0);
-
   const courses = [...new Map(assignments.map((a) => [a.courseId, a.courseName])).entries()]
-    .map(([id, name]) => ({ id, name }))
+    .map(([id, name]) => {
+      const meta = termByCourse.get(id);
+      const parsed = parseTermCode(meta?.term);
+      return {
+        id,
+        name,
+        code: meta?.code ?? null,
+        term: meta?.term ?? null,
+        termLabel: parsed.label,
+        termShort: parsed.short,
+        termSortKey: parsed.sortKey,
+      };
+    })
     .sort((a, b) => a.name.localeCompare(b.name));
 
-  const loCodes = [...new Set(assignments.flatMap((a) => a.loCodes))].sort(
-    (a, b) => Number(a.slice(2)) - Number(b.slice(2)),
-  );
+  /* Elke opdracht krijgt zijn semester, zodat de UI kan filteren zonder de
+     cursuslijst te hoeven kennen. */
+  const withTerm = assignments.map((a) => {
+    const course = courses.find((c) => c.id === a.courseId);
+    return {
+      ...a,
+      term: course?.term ?? null,
+      termLabel: course?.termLabel ?? null,
+      termShort: course?.termShort ?? null,
+      termSortKey: course?.termSortKey ?? -1,
+    };
+  });
 
-  const within = (days) =>
-    upcoming.filter((a) => Date.parse(a.dueAt) - nowMs <= days * 86_400_000).length;
+  const currentTerm = currentTermCode(now);
+  const currentSortKey = parseTermCode(currentTerm).sortKey;
+  const semesters = groupBySemester(
+    courses.map((c) => ({
+      id: c.id,
+      name: c.name,
+      term: c.term,
+      counts: { portfolioOpen: withTerm.filter((a) => a.courseId === c.id && a.state === 'unsubmitted').length },
+    })),
+    currentTerm,
+  ).map((group) => {
+    const items = withTerm.filter((a) => a.term === group.code);
+    const coverage = buildCriterionCoverage(items);
+    const open = items.filter((a) => a.state === 'unsubmitted');
+    return {
+      code: group.code,
+      label: group.label,
+      short: group.short,
+      isCurrent: group.isCurrent,
+      // Een semester dat nog moet beginnen. Handig voor de UI: je wilt niet
+      // standaard in de toekomst kijken.
+      isFuture: group.sortKey > currentSortKey,
+      sortKey: group.sortKey,
+      courseIds: group.courses.map((c) => c.id),
+      courses: group.courses.map((c) => ({ id: c.id, name: c.name })),
+      stats: {
+        assignments: items.length,
+        open: open.length,
+        submitted: items.length - open.length,
+        overdue: open.filter((a) => a.dueAt && Date.parse(a.dueAt) < nowMs).length,
+        criteriaTotal: coverage.length,
+        criteriaGaps: coverage.filter((c) => c.evidenceCount === 0).length,
+        evidence: coverage.reduce((sum, c) => sum + c.evidenceCount, 0),
+      },
+    };
+  });
 
   return {
     generatedAt: now.toISOString(),
     cached: false,
+    currentTerm,
+    termsReady: termByCourse.size > 0,
+    semesters,
+    courses,
+    assignments: withTerm,
+  };
+}
+
+/**
+ * De volledige analyse, maar per semester gefilterd.
+ *
+ * De UI vraagt dit op wanneer je van semester wisselt. Zo blijft het eerste
+ * antwoord klein en wordt de zware dekkingsberekening pas gedaan als er echt
+ * naar een semester gekeken wordt.
+ */
+export function payloadForSemester(payload, termCode) {
+  const items = payload.assignments.filter((a) => (termCode ? a.term === termCode : true));
+  const nowMs = Date.now();
+
+  const open = items.filter((a) => a.state === 'unsubmitted');
+  const coverage = buildCriterionCoverage(items);
+  const gaps = coverage.filter((c) => c.evidenceCount === 0);
+  const upcoming = open
+    .filter((a) => a.dueAt && Date.parse(a.dueAt) >= nowMs)
+    .sort((a, b) => Date.parse(a.dueAt) - Date.parse(b.dueAt));
+
+  const within = (days) => upcoming.filter((a) => Date.parse(a.dueAt) - nowMs <= days * 86_400_000).length;
+
+  return {
+    termCode: termCode ?? null,
     stats: {
-      total: assignments.length,
+      total: items.length,
       open: open.length,
-      overdue: overdue.length,
-      submitted: assignments.length - open.length,
+      overdue: open.filter((a) => a.dueAt && Date.parse(a.dueAt) < nowMs).length,
+      submitted: items.length - open.length,
       next7: within(7),
       next14: within(14),
       next30: within(30),
@@ -138,9 +273,10 @@ function buildPayload(assignments) {
       criteriaCovered: coverage.length - gaps.length,
       criteriaGaps: gaps.length,
     },
-    courses,
-    loCodes,
-    assignments,
+    loCodes: [...new Set(items.flatMap((a) => a.loCodes))].sort(
+      (a, b) => Number(a.slice(2)) - Number(b.slice(2)),
+    ),
+    assignments: items,
     coverage: coverage.map((c) => ({
       ...c,
       evidence: c.evidence.slice(0, 12),
@@ -150,6 +286,7 @@ function buildPayload(assignments) {
 }
 
 async function getPayload({ force = false } = {}) {
+  await refreshTerms(force);
   if (!force && cache && Date.now() - cache.at < CACHE_MS) {
     return { ...cache.payload, cached: true, cacheAgeMs: Date.now() - cache.at };
   }
@@ -194,9 +331,22 @@ const MIME = {
   '.pptx': 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
 };
 
+/**
+ * Maakt van een willekeurige waarde een geldige HTTP-status.
+ *
+ * Nodig omdat Node status 0 doorgeeft als een request wordt afgebroken. Zonder
+ * deze controle gooit writeHead een RangeError en valt de hele server om — één
+ * afgebroken request hoort nooit het dashboard te laten crashen.
+ */
+function safeStatus(value, fallback = 500) {
+  const n = Number(value);
+  return Number.isInteger(n) && n >= 100 && n <= 599 ? n : fallback;
+}
+
 function sendJson(res, status, body) {
+  if (res.headersSent) return;
   const text = JSON.stringify(body);
-  res.writeHead(status, {
+  res.writeHead(safeStatus(status), {
     ...security.headers(),
     'Content-Type': 'application/json; charset=utf-8',
     'Content-Length': Buffer.byteLength(text),
@@ -388,6 +538,16 @@ async function serveStatic(req, res, urlPath) {
 }
 
 const server = createServer(async (req, res) => {
+  /*
+   * Een afgebroken verbinding is geen fout van ons.
+   *
+   * Zonder deze twee regels belandt een afgebroken request in de catch hieronder
+   * en crasht de server op `Invalid status code: 0` — één gesloten tabblad zou
+   * dan het hele dashboard omver halen.
+   */
+  req.on('error', () => {});
+  res.on('error', () => {});
+
   const url = new URL(req.url, `http://${HOST}:${PORT}`);
   const { pathname } = url;
 
@@ -416,7 +576,34 @@ const server = createServer(async (req, res) => {
 
     if (pathname === '/api/data') {
       const force = url.searchParams.get('force') === '1';
-      return sendJson(res, 200, await getPayload({ force }));
+      const payload = await getPayload({ force });
+      const term = url.searchParams.get('term');
+
+      // Zonder term: alleen het lichte overzicht met de semesters. De zware
+      // dekkinsberekening volgt pas als er een semester gekozen is.
+      if (!term) {
+        return sendJson(res, 200, {
+          generatedAt: payload.generatedAt,
+          cached: payload.cached,
+          cacheAgeMs: payload.cacheAgeMs,
+          currentTerm: payload.currentTerm,
+          termsReady: payload.termsReady,
+          semesters: payload.semesters,
+          courses: payload.courses,
+          documentStats: payload.documentStats,
+        });
+      }
+
+      return sendJson(res, 200, {
+        generatedAt: payload.generatedAt,
+        cached: payload.cached,
+        currentTerm: payload.currentTerm,
+        termsReady: payload.termsReady,
+        semesters: payload.semesters,
+        courses: payload.courses,
+        documentStats: payload.documentStats,
+        ...payloadForSemester(payload, term),
+      });
     }
 
     if (pathname === '/api/state') {
@@ -433,6 +620,341 @@ const server = createServer(async (req, res) => {
       }
       res.writeHead(405).end();
       return;
+    }
+
+    /* ── Documenten ───────────────────────────────────────────────────────
+       Een eigen documentwerkplek in het dashboard. De generator komt uit Krava
+       (zie mcp/lib/docx.mjs en assemble.mjs), maar dit is geen verwijzing naar
+       Krava: het is een eigen werkplek met eigen opslag. Krava blijft een los
+       project en hoeft niet te draaien. */
+
+    /*
+     * Waar hoort een document uit de inbox?
+     *
+     * Dit is de automatiseringslaag: leest het bestand, bepaalt de map, de
+     * leeruitkomsten en een toelichting, en zegt wat er daarna nog mist. Er
+     * wordt niets verstuurd — het is een voorstel.
+     */
+    if (pathname.startsWith('/api/documenten/inbox/') && pathname.endsWith('/indelen') && req.method === 'GET') {
+      const id = decodeURIComponent(pathname.slice('/api/documenten/inbox/'.length, -'/indelen'.length));
+      const found = await docs.filePathFor(id);
+      if (!found) return sendJson(res, 404, { error: 'document niet gevonden' });
+
+      const { tekstUitBestand } = await import('../mcp/lib/tekst.mjs');
+      const { analyseerVoorInleveren } = await import('../mcp/lib/indeler.mjs');
+      const { zonderOpmaakrommel } = await import('./lib/documenten.mjs');
+
+      const gelezen = tekstUitBestand(found.full);
+      /*
+       * De opmaakregels eruit voordat we iets met de tekst doen. Anders komt de
+       * regel met het TOC-veld in de voorgestelde toelichting terecht.
+       */
+      const tekst = zonderOpmaakrommel(gelezen.tekst);
+      const titel = found.doc.title ?? path.basename(found.full);
+
+      /* De huidige dekking van de mappen ophalen, zodat "wat mist er" klopt. */
+      let mappen = null;
+      try {
+        const vers = url.searchParams.get('force') === '1';
+        let data = mappenCache.data;
+        if (vers || !data) {
+          const result = await runPortflow(['--mappen']);
+          if (result.body?.ok) {
+            mappenCache = { at: Date.now(), data: result.body };
+            data = result.body;
+          }
+        }
+        mappen = data?.mappen?.map((m) => ({
+          naam: m.naam,
+          id: m.id,
+          gedekt: m.gedekt ?? [],
+          bewijs: m.bewijs ?? [],
+        })) ?? null;
+      } catch {
+        /* zonder dekking wordt het voorstel grover, maar het werkt */
+      }
+
+      const uit = analyseerVoorInleveren({
+        titel,
+        bestandsnaam: path.basename(found.full),
+        tekst,
+        beschrijving: found.doc.note ?? '',
+        mappen,
+      });
+
+      return sendJson(res, 200, {
+        document: { id: found.doc.id, titel, bestandsnaam: path.basename(found.full), bytes: found.doc.size },
+        tekst: {
+          gelukt: gelezen.gelukt,
+          soort: gelezen.soort,
+          tekens: gelezen.tekens,
+          // Het aantal tekens dat overblijft na het weghalen van de opmaak.
+          bruikbaar: tekst.length,
+          reden: gelezen.reden ?? null,
+          begin: tekst.slice(0, 300),
+        },
+        voorstel: uit.voorstel,
+        alternatieven: uit.alternatieven,
+        leeruitkomsten: uit.leeruitkomsten,
+        aanbevolenLeeruitkomsten: uit.aanbevolenLeeruitkomsten,
+        voorgesteldeBeschrijving: uit.voorgesteldeBeschrijving,
+        onzeker: uit.onzeker,
+        uitleg: uit.uitleg,
+        alle: uit.alle,
+      });
+    }
+
+    if (pathname === '/api/documenten' && req.method === 'GET') {
+      return sendJson(res, 200, { documenten: werkplek.lijst() });
+    }
+
+    if (pathname === '/api/documenten' && req.method === 'POST') {
+      let body = {};
+      try {
+        body = await readBody(req);
+      } catch {
+        body = {};
+      }
+      const document = werkplek.bewaar(werkplek.leegDocument(body));
+      return sendJson(res, 201, { document });
+    }
+
+    /* Een Krava-project overnemen. Zo krijg je werk dat al in Krava staat hier
+       verder af, zonder dat de twee projecten aan elkaar vast zitten. */
+    if (pathname === '/api/documenten/van-krava' && req.method === 'POST') {
+      let body = {};
+      try {
+        body = await readBody(req);
+      } catch {
+        body = {};
+      }
+      const projectId = body.projectId;
+      if (!projectId) return sendJson(res, 400, { error: 'geen projectId opgegeven' });
+      try {
+        const gevonden = await kravaProjectVanSchijf(projectId);
+        const document = werkplek.neemOver(gevonden.project);
+        return sendJson(res, 201, { document, van: gevonden.titel });
+      } catch (error) {
+        return sendJson(res, 404, { error: error.message });
+      }
+    }
+
+    if (pathname.startsWith('/api/documenten/')) {
+      const rest = pathname.slice('/api/documenten/'.length);
+      const [id, actie] = rest.split('/');
+      const documentId = decodeURIComponent(id ?? '');
+
+      if (actie === 'docx' && req.method === 'GET') {
+        const document = werkplek.lees(documentId);
+        if (!document) return sendJson(res, 404, { error: 'document niet gevonden' });
+        try {
+          const uit = projectNaarDocx(document);
+          const naam = uit.filename.replace(/[^\p{L}\p{N}._-]/gu, '_');
+          res.writeHead(200, {
+            'Content-Type': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+            'Content-Disposition': `attachment; filename="${naam}"`,
+            'Content-Length': uit.buffer.length,
+            'Cache-Control': 'no-store',
+            'X-Content-Type-Options': 'nosniff',
+          });
+          return res.end(uit.buffer);
+        } catch (error) {
+          return sendJson(res, 400, { error: `Word maken mislukt: ${error.message}` });
+        }
+      }
+
+      if (actie === 'leeruitkomsten' && req.method === 'GET') {
+        const document = werkplek.lees(documentId);
+        if (!document) return sendJson(res, 404, { error: 'document niet gevonden' });
+        const tekst = (document.plan?.secties || [])
+          .map((s) => `${s.titel}\n${s.tekst || ''}`)
+          .join('\n\n');
+        const uit = checkDocument({ titel: document.titel, tekst, beschrijving: document.brief });
+        return sendJson(res, 200, {
+          uitleg: uit.uitleg,
+          onzeker: uit.onzeker,
+          signaalSterkte: uit.signaalSterkte,
+          treffers: uit.treffers.map((t) => ({
+            code: t.code,
+            naam: t.naam,
+            relatief: t.relatief,
+            begrippen: t.begrippen,
+            portflowGoalId: t.portflowGoalId,
+          })),
+          // Welke Portflow-doelen hieruit volgen, klaar om te koppelen.
+          portflowGoalIds: naarPortflowGoalIds(uit.treffers),
+        });
+      }
+
+      /* De mappen van dit semester, met hun Portflow-id. */
+      if (actie === 'mappen' && req.method === 'GET') {
+        return sendJson(res, 200, { mappen: semesterMappen() });
+      }
+
+      /*
+       * Inleveren bij Portflow.
+       *
+       * De hele keten in één aanroep: het document wordt een Word-bestand, dat
+       * gaat naar de gekozen map, en de leeruitkomsten die de check vindt worden
+       * als doelen gekoppeld.
+       *
+       * De doel-id's komen uit data/lo-koppeling.json, niet uit een naam-match.
+       * Portflow heeft "Professional Standard" vier keer; op naam koppelen zet
+       * je bewijs aan het doel van een vorig semester.
+       */
+      if (actie === 'inleveren' && req.method === 'POST') {
+        const document = werkplek.lees(documentId);
+        if (!document) return sendJson(res, 404, { error: 'document niet gevonden' });
+
+        let body = {};
+        try {
+          body = await readBody(req);
+        } catch {
+          return sendJson(res, 400, { error: 'ongeldige JSON' });
+        }
+
+        const collectionId = Number(body.collectionId);
+        if (!collectionId) return sendJson(res, 400, { error: 'geen map gekozen' });
+
+        if (!security.rateLimitOk()) {
+          security.noteRateLimit();
+          return sendJson(res, 429, {
+            error: 'Te veel verzoeken in korte tijd. Probeer het over een minuut opnieuw.',
+            code: 'RATE_LIMITED',
+          });
+        }
+
+        /* Welke leeruitkomsten? Zelf opgegeven, of door de check bepaald. */
+        const tekst = (document.plan?.secties || []).map((s) => `${s.titel}\n${s.tekst || ''}`).join('\n\n');
+        const analyse = checkDocument({ titel: document.titel, tekst, beschrijving: document.brief });
+        const gevondenIds = naarPortflowGoalIds(analyse.treffers);
+        const zelfGekozen = Array.isArray(body.goalIds) && body.goalIds.length > 0;
+        const goalIds = zelfGekozen
+          ? body.goalIds.map(Number).filter((n) => Number.isFinite(n))
+          : gevondenIds;
+
+        /* Het document naar Word, op een tijdelijke plek. */
+        let doc;
+        try {
+          doc = projectNaarDocx(document);
+        } catch (error) {
+          return sendJson(res, 400, { error: `Word maken mislukt: ${error.message}` });
+        }
+
+        werkplek.zorgVoorTijdelijk();
+        const tijdelijk = path.join(werkplek.TIJDELIJK, `${document.id}.docx`);
+        try {
+          writeFileSync(tijdelijk, doc.buffer);
+        } catch (error) {
+          return sendJson(res, 500, { error: `tijdelijk bestand schrijven mislukt: ${error.message}` });
+        }
+
+        const args = [
+          '--file',
+          tijdelijk,
+          '--collection',
+          String(collectionId),
+          '--name',
+          String(body.naam || document.titel || 'Document').slice(0, 120),
+        ];
+        if (goalIds.length) args.push('--goal-ids', goalIds.join(','));
+        const toelichting = String(body.toelichting || document.brief || '').slice(0, 2000);
+        if (toelichting) args.push('--description', toelichting);
+
+        const result = await runPortflow(args);
+
+        // Het tijdelijke bestand mag weg; Portflow heeft het nu.
+        try {
+          rmSync(tijdelijk, { force: true });
+        } catch {
+          /* niet erg */
+        }
+
+        /*
+         * Alleen een geslaagde upload vastleggen. Een mislukte poging is geen
+         * inlevering en hoort niet in de geschiedenis te staan.
+         */
+        if (result.body?.ok && result.body?.evidenceId) {
+          werkplek.noteerInlevering(document.id, {
+            mapId: collectionId,
+            mapNaam: result.body.collection?.name ?? null,
+            bewijsId: result.body.evidenceId,
+            bestandsnaam: doc.filename,
+            bytes: doc.buffer.length,
+            goalIds,
+            leeruitkomsten: analyse.treffers.map((t) => ({ code: t.code, naam: t.naam })),
+            toelichting,
+          });
+        }
+
+        return sendJson(res, result.status, {
+          ...result.body,
+          geleverd: {
+            document: document.titel,
+            bestandsnaam: doc.filename,
+            bytes: doc.buffer.length,
+            secties: doc.statistiek?.secties ?? null,
+          },
+          leeruitkomsten: {
+            gevonden: analyse.treffers.map((t) => ({ code: t.code, naam: t.naam, relatief: t.relatief })),
+            gebruikt: goalIds,
+            zelfGekozen,
+            uitleg: analyse.uitleg,
+          },
+        });
+      }
+
+      if (actie === undefined) {
+        if (req.method === 'GET') {
+          const document = werkplek.lees(documentId);
+          if (!document) return sendJson(res, 404, { error: 'document niet gevonden' });
+          return sendJson(res, 200, { document });
+        }
+        if (req.method === 'PUT') {
+          const bestaand = werkplek.lees(documentId);
+          if (!bestaand) return sendJson(res, 404, { error: 'document niet gevonden' });
+          let body = {};
+          try {
+            body = await readBody(req);
+          } catch {
+            return sendJson(res, 400, { error: 'ongeldige JSON' });
+          }
+          // Het id ligt vast; de rest mag overschreven worden.
+          const bijgewerkt = werkplek.bewaar({ ...bestaand, ...body, id: bestaand.id });
+          return sendJson(res, 200, { document: bijgewerkt });
+        }
+        if (req.method === 'DELETE') {
+          const weg = werkplek.verwijder(documentId);
+          return sendJson(res, weg ? 200 : 404, { removed: weg });
+        }
+      }
+    }
+
+    if (pathname === '/api/krava' && req.method === 'GET') {
+      /*
+       * Krava is een LOS project. We laten alleen zien of het er is, zodat je
+       * het kunt openen als je het nodig hebt — niet om er iets van af te
+       * hangen. De projectenlijst is er zodat je ze kunt overnemen.
+       */
+      const status = await kravaStatus();
+      const projecten = await kravaProjectenVanSchijf();
+      return sendJson(res, 200, {
+        installed: status.installed,
+        running: status.running,
+        loginRequired: Boolean(status.loginRequired),
+        appUrl: status.appUrl ?? null,
+        dir: status.dir ?? null,
+        error: status.error ?? null,
+        projects: projecten.map((p) => ({
+          id: p.id,
+          titel: p.titel,
+          vak: p.vak,
+          documenttype: p.documenttype,
+          bijgewerkt: p.bijgewerkt,
+          tekens: p.tekens,
+          secties: p.secties,
+        })),
+      });
     }
 
     if (pathname === '/api/health') {
@@ -527,9 +1049,140 @@ const server = createServer(async (req, res) => {
        De server start dat script en leest het JSON-resultaat van de laatste
        regel. Er wordt niets geüpload zonder expliciete opdracht. */
 
+    /*
+     * De mappen van dit semester met hun inhoud, en per map welke
+     * leeruitkomsten gedekt zijn.
+     *
+     * Dit is wat de Portflow-tab toont. De gegevens komen uit het
+     * portfolio-freezes-endpoint van Portflow: dat is het enige dat bewijs MET
+     * zijn doelen teruggeeft. Het gewone collectie-endpoint geeft alleen de
+     * stukken, zonder koppelingen, en dan kun je niets over dekking zeggen.
+     */
+    if (pathname === '/api/portflow/mappen' && req.method === 'GET') {
+      const nu = Date.now();
+      const vers = url.searchParams.get('force') === '1';
+      if (!vers && mappenCache.data && nu - mappenCache.at < PORTFLOW_CACHE_MS) {
+        return sendJson(res, 200, { ...mappenCache.data, cached: true, cacheAgeMs: nu - mappenCache.at });
+      }
+
+      const result = await runPortflow(['--mappen']);
+      if (result.body?.ok) {
+        mappenCache = { at: Date.now(), data: result.body };
+        return sendJson(res, 200, { ...result.body, cached: false });
+      }
+      // Liever iets ouds dan niets.
+      if (mappenCache.data) {
+        return sendJson(res, 200, {
+          ...mappenCache.data,
+          cached: true,
+          stale: true,
+          warning: result.body?.error ?? 'Portflow was niet bereikbaar; dit is de vorige lijst.',
+        });
+      }
+      return sendJson(res, result.status, result.body);
+    }
+
+    /*
+     * De leeswijzer als beschrijving van een map zetten.
+     *
+     * Dit is wat de docent in Portflow leest, dus het is de moeite van een eigen
+     * endpoint waard. De bestaande beschrijving wordt overschreven — de UI
+     * vraagt daar bevestiging voor.
+     */
+    if (pathname === '/api/portflow/beschrijving' && req.method === 'POST') {
+      let body = {};
+      try {
+        body = await readBody(req);
+      } catch {
+        return sendJson(res, 400, { error: 'ongeldige JSON' });
+      }
+      const collectionId = Number(body.collectionId);
+      const tekst = String(body.tekst ?? '');
+      if (!collectionId) return sendJson(res, 400, { error: 'geen map opgegeven' });
+      if (!tekst) return sendJson(res, 400, { error: 'geen tekst opgegeven' });
+
+      if (!security.rateLimitOk()) {
+        security.noteRateLimit();
+        return sendJson(res, 429, {
+          error: 'Te veel verzoeken in korte tijd. Probeer het over een minuut opnieuw.',
+          code: 'RATE_LIMITED',
+        });
+      }
+
+      /* De tekst gaat via een tijdelijk bestand mee: op de opdrachtregel zou
+         hij te lang worden en er zitten regeleinden in. */
+      werkplek.zorgVoorTijdelijk();
+      const tijdelijk = path.join(werkplek.TIJDELIJK, `beschrijving-${collectionId}.txt`);
+      try {
+        writeFileSync(tijdelijk, tekst, 'utf8');
+      } catch (error) {
+        return sendJson(res, 500, { error: `tijdelijk bestand schrijven mislukt: ${error.message}` });
+      }
+
+      const result = await runPortflow([
+        '--beschrijving',
+        '--collection',
+        String(collectionId),
+        '--tekst-bestand',
+        tijdelijk,
+      ]);
+
+      try {
+        rmSync(tijdelijk, { force: true });
+      } catch {
+        /* niet erg */
+      }
+
+      // De gecachte mappen zijn nu verouderd.
+      mappenCache = { at: 0, data: null };
+      return sendJson(res, result.status, result.body);
+    }
+
+    /*
+     * De snapshots van dit portfolio.
+     *
+     * Een snapshot is een bevriezing: je kunt hem niet meer aanpassen, alleen
+     * bekijken of verwijderen. Handig om te zien wat je wanneer hebt ingeleverd,
+     * en om te controleren of er geen test-snapshot is blijven staan.
+     */
+    if (pathname === '/api/portflow/snapshots' && req.method === 'GET') {
+      const nu = Date.now();
+      const vers = url.searchParams.get('force') === '1';
+      if (!vers && snapshotsCache.data && nu - snapshotsCache.at < PORTFLOW_CACHE_MS) {
+        return sendJson(res, 200, { ...snapshotsCache.data, cached: true, cacheAgeMs: nu - snapshotsCache.at });
+      }
+      const result = await runPortflow(['--snapshots']);
+      if (result.body?.ok) {
+        snapshotsCache = { at: Date.now(), data: result.body };
+        return sendJson(res, 200, { ...result.body, cached: false });
+      }
+      if (snapshotsCache.data) {
+        return sendJson(res, 200, {
+          ...snapshotsCache.data,
+          cached: true,
+          stale: true,
+          warning: result.body?.error ?? 'Portflow was niet bereikbaar; dit is de vorige lijst.',
+        });
+      }
+      return sendJson(res, result.status, result.body);
+    }
+
     if (pathname === '/api/portflow/collections' && req.method === 'GET') {
-      // Een browser starten is duur; rem erop zodat één script dat niet
-      // honderd keer achter elkaar kan doen.
+      /*
+       * Collecties veranderen zelden, en een browser starten is duur. We
+       * bewaren ze daarom een tijdje: scheelt tijd én het houdt de rem op
+       * dure routes vrij voor het echte werk (versturen).
+       */
+      const now = Date.now();
+      const fresh = url.searchParams.get('force') === '1';
+      if (!fresh && portflowCache.collections && now - portflowCache.at < PORTFLOW_CACHE_MS) {
+        return sendJson(res, 200, {
+          ...portflowCache.collections,
+          cached: true,
+          cacheAgeMs: now - portflowCache.at,
+        });
+      }
+
       if (!security.rateLimitOk()) {
         security.noteRateLimit();
         return sendJson(res, 429, {
@@ -538,10 +1191,23 @@ const server = createServer(async (req, res) => {
         });
       }
       const result = await runPortflow(['--list']);
-      return sendJson(res, result.status, result.body);
+      if (result.body?.ok) {
+        portflowCache = { at: Date.now(), collections: result.body };
+      } else if (portflowCache.collections) {
+        // Liever iets oud dan niets: geef de vorige lijst terug met een noot.
+        return sendJson(res, 200, {
+          ...portflowCache.collections,
+          cached: true,
+          stale: true,
+          cacheAgeMs: Date.now() - portflowCache.at,
+          warning: result.body?.error ?? 'Portflow was niet bereikbaar; dit is de vorige lijst.',
+        });
+      }
+      return sendJson(res, result.status, { ...result.body, cached: false });
     }
 
     if (pathname === '/api/portflow/send' && req.method === 'POST') {
+      // Versturen is het echte werk: daar is de rem voor bedoeld.
       if (!security.rateLimitOk()) {
         security.noteRateLimit();
         return sendJson(res, 429, {
@@ -584,8 +1250,13 @@ const server = createServer(async (req, res) => {
 
     return serveStatic(req, res, pathname);
   } catch (error) {
+    // Verbinding verbroken: er is niemand meer om het antwoord aan te geven.
+    if (error?.code === 'ECONNRESET' || error?.code === 'EPIPE' || res.writableEnded) {
+      return;
+    }
     const isToken = error?.code === 'NO_TOKEN';
-    const status = error?.status ?? (isToken ? 503 : 502);
+    // safeStatus vangt onder meer de status 0 van een afgebroken request op.
+    const status = safeStatus(error?.status, isToken ? 503 : 502);
     sendJson(res, status, {
       error: error?.message ?? String(error),
       code: error?.code ?? 'UPSTREAM',

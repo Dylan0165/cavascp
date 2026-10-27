@@ -113,7 +113,58 @@ export function createCanvas({ baseUrl = DEFAULT_BASE, token, timeoutMs = 45000 
     return results;
   }
 
-  return { base, get, cache };
+  /**
+   * POST met een JSON-body.
+   *
+   * Dit is de enige schrijvende methode in de client. Hij bestaat omdat
+   * inleveren niet zonder kan; al het andere blijft lezen.
+   */
+  async function post(path, body = {}) {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), timeoutMs);
+    let response;
+    try {
+      response = await fetch(base + path, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          Accept: 'application/json',
+          'Content-Type': 'application/json',
+          'User-Agent': 'cavascp-mcp/1.0 (+lokaal)',
+        },
+        body: JSON.stringify(body),
+        signal: controller.signal,
+      });
+    } catch (error) {
+      clearTimeout(timer);
+      throw new CanvasError(`Canvas niet bereikbaar (${error.name}): ${error.message}`, 0, null);
+    } finally {
+      clearTimeout(timer);
+    }
+
+    const text = await response.text();
+    let data = null;
+    try {
+      data = text ? JSON.parse(text) : null;
+    } catch {
+      data = null;
+    }
+
+    if (!response.ok) {
+      const detail =
+        data?.errors?.map((e) => e.message ?? JSON.stringify(e)).join('; ') ||
+        (Array.isArray(data) ? JSON.stringify(data) : text.slice(0, 240));
+      throw new CanvasError(
+        `Canvas gaf ${response.status} op POST ${path}: ${detail}`,
+        response.status,
+        data,
+      );
+    }
+
+    return data;
+  }
+
+  return { base, get, post, cache };
 }
 
 /** Parse the RFC8288 Link header Canvas sends for paginated collections. */

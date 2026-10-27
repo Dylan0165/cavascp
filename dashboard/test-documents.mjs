@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Test de document-inbox: de multipart-parser los, Ã©n de hele HTTP-cyclus.
+ * Test de document-inbox: de multipart-parser los, én de hele HTTP-cyclus.
  *
  * Start zijn eigen server op een aparte poort, zodat een al draaiend dashboard
  * niet in de weg zit en de test niets in de echte inbox achterlaat.
@@ -43,10 +43,10 @@ function api(path, options = {}) {
 const results = [];
 function check(label, ok, detail = '') {
   results.push({ label, ok: Boolean(ok) });
-  console.log(`  ${ok ? 'PASS' : 'FAIL'}  ${label}${detail ? ` â€” ${detail}` : ''}`);
+  console.log(`  ${ok ? 'PASS' : 'FAIL'}  ${label}${detail ? ` — ${detail}` : ''}`);
 }
 
-/* â”€â”€ 1. multipart-parser, zonder server â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+/* ── 1. multipart-parser, zonder server ─────────────────────────────────── */
 
 console.log('1) multipart-parser');
 {
@@ -70,7 +70,7 @@ console.log('1) multipart-parser');
   check('meerdere velden', parsed.fields.loCodes === 'LO1, LO2');
 }
 
-/* â”€â”€ 2. server met een tijdelijke documentmap â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+/* ── 2. server met een tijdelijke documentmap ───────────────────────────── */
 
 // The server takes its inbox location from the environment, so this test gets
 // its own scratch directory and never touches the real dashboard/documents/.

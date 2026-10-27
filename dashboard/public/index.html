@@ -24,13 +24,6 @@
 
 <a class="skip" href="#main">Naar de inhoud</a>
 
-<!-- Gelaagde achtergrond: het glas heeft iets te breken nodig. -->
-<div class="bg" aria-hidden="true">
-  <span class="bg__blob bg__blob--a"></span>
-  <span class="bg__blob bg__blob--b"></span>
-  <span class="bg__blob bg__blob--c"></span>
-</div>
-
 <header class="topbar">
   <div class="topbar__left">
     <span class="mark" aria-hidden="true"></span>
@@ -62,13 +55,17 @@
     <dl class="vitals" id="vitals" aria-label="Kerncijfers"></dl>
   </section>
 
+  <nav class="semesters" id="semesters" aria-label="Semester"></nav>
+
+  <div class="tabs" id="tabs" role="tablist" aria-label="Weergave"></div>
+
   <section class="toolbar" aria-label="Filters">
     <div class="seg" role="group" aria-label="Periode">
       <button class="seg__btn" data-when="all" type="button">Alles</button>
       <button class="seg__btn" data-when="overdue" type="button">Verlopen <span class="seg__n" data-n="overdue">0</span></button>
       <button class="seg__btn" data-when="7" type="button">7 dagen <span class="seg__n" data-n="7">0</span></button>
-      <button class="seg__btn" data-when="30" type="button">30 dagen <span class="seg__n" data-n="30">0</span></button>
-      <button class="seg__btn" data-when="90" type="button">90 dagen</button>
+      <button class="seg__btn" data-when="28" type="button">4 weken</button>
+      <button class="seg__btn" data-when="90" type="button">3 maanden</button>
     </div>
     <div class="seg" role="group" aria-label="Status">
       <button class="seg__btn" data-state="all" type="button">Elke status</button>
@@ -88,6 +85,36 @@
   </section>
 
   <div class="grid">
+    <section class="panel panel--wide" id="panel-docs" hidden>
+      <header class="panel__head">
+        <h2>Documenten</h2>
+        <span class="panel__count" id="docs-count"></span>
+      </header>
+
+      <div class="work">
+        <aside class="work__list" id="work-list" aria-label="Documenten"></aside>
+
+        <div class="work__main" id="work-main">
+          <div class="empty" id="work-empty">
+            <h3>Nog geen document</h3>
+            <p>Maak een document, of neem een project over dat al in Krava staat.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="panel panel--wide" id="panel-portflow" hidden>
+      <header class="panel__head">
+        <h2>Portflow</h2>
+        <button class="btn btn--ghost btn--sm" id="portflow-ververs" type="button">Verversen</button>
+      </header>
+      <p class="panel__uitleg">
+        De mappen van dit semester, wat erin zit, en welke leeruitkomsten het bewijs dekt.
+        De leeswijzer is wat je docent leest.
+      </p>
+      <div id="portflow-inhoud"></div>
+    </section>
+
     <section class="col col--main" aria-labelledby="tl-h">
       <div class="panel">
         <div class="col__head">

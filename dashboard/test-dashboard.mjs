@@ -165,7 +165,8 @@ async function main() {
   const vitals = await evaluate(
     `[...document.querySelectorAll('.vital dd')].map(d => d.textContent)`,
   );
-  check('vital-cijfers gevuld', vitals.length === 4, vitals.join(' / '));
+  // Vijf cijfers: te laat, binnen 4 weken, nog open, ingeleverd, criteria open.
+  check('vital-cijfers gevuld', vitals.length === 5, vitals.join(' / '));
   check('geen JS-fouten bij laden', consoleErrors.length === 0, consoleErrors.slice(0, 2).join(' | '));
 
   console.log('\n2) filteren');
@@ -185,10 +186,12 @@ async function main() {
     (await evaluate(`!document.querySelector('#clear').hidden`)) === true,
   );
 
-  await evaluate(`document.querySelector('.seg__btn[data-when="90"]').click(); true`);
+  // Terug naar de beginstand: het venster van vier weken. Dat is geen filter
+  // dat de gebruiker heeft gezet, dus de knop hoort dan weer te verdwijnen.
+  await evaluate(`document.querySelector('.seg__btn[data-when="28"]').click(); true`);
   await sleep(300);
   check(
-    '"Filters wissen" weer verborgen bij standaardweergave',
+    '"Filters wissen" weer verborgen bij de beginstand (4 weken)',
     (await evaluate(`document.querySelector('#clear').hidden`)) === true,
   );
 

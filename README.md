@@ -205,6 +205,45 @@ stylesheets en één JS-module. Geen React, geen Tailwind, geen build-stap: je
 start het met `node server.mjs` en het werkt. Een bundler zou hier alleen
 opstarttijd en afhankelijkheden toevoegen zonder iets op te leveren.
 
+## Vormgeving
+
+Twee thema's op dezelfde tokens: **crème** (licht) en **den** (donker). Je
+wisselt rechtsboven, of met `?theme=light` / `?theme=dark` in de URL.
+
+De kleuren staan in **OKLCH**, niet in HSL. Dat is perceptueel uniform: gelijke
+stappen in lichtheid zien er ook gelijk uit. De neutralen zijn meegetint naar de
+merkgroen (chroma 0,007–0,024), zodat het crème warm leest in plaats van grijs.
+Bij extreme lichtheid zakt de chroma, want veel chroma bij bijna-wit wordt
+schreeuwerig.
+
+| Rol | Licht | Donker |
+|---|---|---|
+| Ondergrond | crème `oklch(97,6% .011 148)` | den `oklch(17% .014 155)` |
+| Paneel | bijna-wit `oklch(99,2% .007 148)` | `oklch(21% .017 155)` |
+| Accent | groen `oklch(50% .099 152)` | groen `oklch(72% .093 152)` |
+| Aandacht | goud `oklch(60% .075 70)` | goud `oklch(80% .070 70)` |
+| Te laat | terracotta `oklch(58% .140 42)` | `oklch(68% .125 42)` |
+
+Het rood is bewust terracotta en niet felrood: ongeveer 8% van de mannen ziet
+rood en groen niet goed uit elkaar, en terracotta blijft naast groen leesbaar.
+
+**Fonts:** Segoe UI Variable, met Cascadia Code voor cijfers. Geen webfont — het
+laadt in 0 ms en werkt offline. De cijfers staan op `tabular-nums`, zodat
+kolommen uitlijnen.
+
+**Vaste rem-maten, geen `clamp()` in de UI.** Vloeiende typografie hoort op
+marketingpagina's; een dashboard heeft voorspelbare maten nodig.
+
+**Geen side-stripes.** Eerder stond er een gekleurde streep van 3px links op
+elke tijdlijnkaart. Dat is de meest herkenbare ontwerpcliché in dashboards. De
+urgentie komt nu van de kleur van de datum, de statuspil en een tint over het
+hele vlak.
+
+**Glas alleen waar het iets doet.** `backdrop-filter` staat op de topbar en de
+werkbalk — die liggen over de inhoud terwijl je scrolt, dus daar is het
+functioneel. Niet op de panelen en niet op de lijst met 55 criteriumrijen; dat
+zou elke scroll-frame opnieuw blur kosten.
+
 **Ingediend is niet hetzelfde als aangetoond.** In zowel de tijdlijn als het
 criteria-paneel krijgt alleen een *beoordeelde* opdracht het groene
 "klaar"-signaal. Een ingeleverd maar onbeoordeeld stuk krijgt een neutrale
