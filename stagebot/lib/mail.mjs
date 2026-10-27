@@ -217,10 +217,15 @@ export function keurMail(mail, profiel = leesProfiel()) {
   /*
    * Een opt-out is verplicht voor zakelijke e-mail. We kijken naar de strekking
    * en niet naar één vaste zin, want het model formuleert het elke keer anders:
-   * "een nee is ook goed", "laat het vooral weten als", "dan hoor ik het graag".
+   * "een nee is ook goed", "een nee is ook prima", "laat het vooral weten als",
+   * "dan hoor ik het graag".
+   *
+   * "prima" en "best" moeten er expliciet bij: het model koos in de praktijk
+   * voor "Een nee is ook prima" en dat werd eerder als ontbrekende opt-out
+   * gemeld — een controle die een goede mail afkeurt, leer je negeren.
    */
   const optOut =
-    /(nee is ook goed|geen interesse|niet ge[ïi]nteresseerd|laat het (vooral |gerust |even )?weten|dan hoor ik het graag|als (dit|deze|jullie) (niets|geen)|hoeft u (niet|geen)|dank is ook goed)/i;
+    /(nee is (ook )?(goed|prima|best|fijn)|geen interesse|niet ge[ïi]nteresseerd|laat het (vooral |gerust |even )?weten|dan hoor ik het graag|als (dit|deze|jullie) (niets|geen)|hoeft u (niet|geen)|dank is ook goed)/i;
   if (!optOut.test(`${body}\n${mail.volledig}`)) {
     punten.push('geen regel waarin ze kunnen afwijzen — dat is verplicht bij zakelijke e-mail');
   }

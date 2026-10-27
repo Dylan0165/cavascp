@@ -201,6 +201,16 @@ check('"een nee is ook goed" telt als opt-out', () => {
   const uit = keurMail(mail, profiel);
   assert.ok(!uit.punten.some((p) => p.includes('afwijzen')));
 });
+check('"een nee is ook prima" telt ook als opt-out', () => {
+  // Het model koos hiervoor in de praktijk; dat werd eerder onterecht afgekeurd.
+  const mail = {
+    body: 'Ik zoek een stage. Een nee is ook prima; dan weet ik dat ik verder kan kijken.',
+    volledig: 'x',
+    waarom: 'x',
+  };
+  const uit = keurMail(mail, profiel);
+  assert.ok(!uit.punten.some((p) => p.includes('afwijzen')), uit.punten.join('; '));
+});
 check('geclaimde ervaring wordt gemeld', () => {
   const mail = {
     body: 'Ik heb jaren ervaring met Python. Een nee is ook goed.',
