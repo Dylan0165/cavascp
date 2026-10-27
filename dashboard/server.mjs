@@ -66,11 +66,28 @@ const ENV_FILE = ENV_PAD;
 const args = process.argv.slice(2);
 const portArg = args.indexOf('--port');
 const PORT = Number(portArg !== -1 ? args[portArg + 1] : process.env.CAVASCP_PORT || 8787);
-const HOST = '127.0.0.1';
-const CACHE_MS = Number(process.env.CAVASCP_CACHE_MS ?? 600_000);
-
-/** Alleen met --allow-remote komen er verbindingen van buiten deze machine door. */
+/*
+ * Waar luistert hij?
+ *
+ * Standaard alleen op loopback: dan kan niemand erbij behalve jij. Met
+ * --allow-remote bindt hij op alle interfaces, en met --host kies je zelf een
+ * adres — bijvoorbeeld het Tailscale-adres, zodat hij bereikbaar is vanaf je
+ * laptop maar niet vanaf de rest van het netwerk.
+ *
+ * De vorige versie zette HOST hard op 127.0.0.1, waardoor --allow-remote alleen
+ * de hostcontrole uitzette en je er alsnog niet bij kon vanaf een andere
+ * machine. Dat werkte dus niet zoals de documentatie zei.
+ *
+ * Alleen met --allow-remote komen er verbindingen van buiten deze machine door.
+ */
 const ALLOW_REMOTE = args.includes('--allow-remote');
+
+const hostArg = args.indexOf('--host');
+const HOST =
+  hostArg !== -1
+    ? args[hostArg + 1]
+    : process.env.CAVASCP_HOST || (ALLOW_REMOTE ? '0.0.0.0' : '127.0.0.1');
+const CACHE_MS = Number(process.env.CAVASCP_CACHE_MS ?? 600_000);
 
 const docs = createDocumentStore({ dir: DOC_DIR, indexFile: DOC_INDEX });
 const security = createSecurity({ port: PORT, allowRemote: ALLOW_REMOTE });
@@ -1483,7 +1500,8 @@ server.listen(PORT, HOST, () => {
   console.log(line);
   console.log('  cavascp dashboard');
   console.log(line);
-  console.log(`  open dit  http://${HOST}:${PORT}`);
+  const toonHost = HOST === '0.0.0.0' ? '127.0.0.1' : HOST;
+  console.log(`  open dit  http://${toonHost}:${PORT}`);
   console.log(`  bron      Canvas @ Fontys ICT (alleen-lezen)`);
   console.log(`  notities  ${path.relative(process.cwd(), STATE_FILE)}`);
   console.log(`  documenten ${path.relative(process.cwd(), path.join(HERE, 'documents'))}`);
@@ -1491,7 +1509,11 @@ server.listen(PORT, HOST, () => {
   console.log(line);
   console.log('  Beveiliging');
   console.log(`    sessiesleutel   ${security.fingerprint}… (alleen deze browser)`);
-  console.log('    alleen vanaf    deze machine (127.0.0.1)');
+  console.log(
+    ALLOW_REMOTE || HOST !== '127.0.0.1'
+      ? `    bereikbaar op   ${HOST}:${PORT} (let op: niet alleen deze machine)`
+      : '    alleen vanaf    deze machine (127.0.0.1)',
+  );
   console.log('    api eist        sessiecookie + eigen oorsprong');
   if (ALLOW_REMOTE) {
     console.log('    LET OP: --allow-remote staat aan; de server is van buiten bereikbaar.');

@@ -10,7 +10,10 @@ REM
 REM Laat dit venster openstaan zolang je het dashboard gebruikt.
 REM
 
+REM Het dashboard luistert op het Tailscale-adres van de mini-pc, niet op
+REM localhost. De tunnel moet dus naar dat adres wijzen.
 set DOEL=ubuntu@100.96.31.24
+set BINNEN=100.96.31.24
 set POORT=8787
 
 echo.
@@ -29,7 +32,7 @@ if %ERRORLEVEL% EQU 0 (
 )
 
 start "" http://127.0.0.1:%POORT%/
-ssh -N -o ExitOnForwardFailure=yes -L %POORT%:127.0.0.1:%POORT% %DOEL%
+ssh -N -o ExitOnForwardFailure=yes -L %POORT%:%BINNEN%:%POORT% %DOEL%
 
 echo.
 echo   Tunnel gesloten.

@@ -154,6 +154,10 @@ cd dashboard
 node test-security.mjs   # 19 checks, waaronder cross-site en vreemde host
 ```
 
+Die test start zijn eigen server op poort 8799. Nodig, want het draaiende
+dashboard luistert op het Tailscale-adres en heeft de hostcontrole uitstaan —
+juist die controle wordt hier getest.
+
 ### Hoe het werkt in de praktijk
 
 Je opent `http://127.0.0.1:8787`. Die pagina zet de sessiesleutel en stuurt je

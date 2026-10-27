@@ -9,8 +9,9 @@ werkt.
 |---|---|
 | machine | `dsh-harness` — Ubuntu, 4 cores, 8 GB, 96 GB schijf |
 | adres (Tailscale) | `100.96.31.24`, SSH-poort 22 |
+| naam (MagicDNS) | `dsh-harness.tail13dd48.ts.net` |
 | project | `/home/ubuntu/cavascp` |
-| dashboard | `http://127.0.0.1:8787` op die machine |
+| dashboard | `http://dsh-harness.tail13dd48.ts.net:8787` (vanaf je laptop) |
 | Node | v24.21.0 |
 | Python | 3.12 |
 | Chrome | 156 (voor de Portflow-brug) |
@@ -27,18 +28,36 @@ ssh ubuntu@100.96.31.24
 cd ~/cavascp
 ```
 
-**Het dashboard bekijken in je browser** — via een tunnel, zodat je niets
-openbaar maakt:
+**Het dashboard bekijken in je browser** — op je laptop, zonder terminal:
 
-```bash
-ssh -N -L 8787:127.0.0.1:8787 ubuntu@100.96.31.24
+- <http://dsh-harness.tail13dd48.ts.net:8787/stage> (de stagebot)
+- <http://dsh-harness.tail13dd48.ts.net:8787/dashboard> (het portfolio)
+
+Dat werkt zolang Tailscale op je laptop aan staat. De service luistert op het
+Tailscale-adres (`100.96.31.24`) en nergens anders: niet op localhost, niet op
+het huisnetwerk. Dat staat zo in de systemd-unit:
+
+```
+ExecStart=/usr/bin/env node .../dashboard/server.mjs --host 100.96.31.24 --allow-remote
 ```
 
-Laat dat venster openstaan en ga naar <http://127.0.0.1:8787>. Het dashboard
-luistert daar alleen op localhost, dus zonder tunnel komt niemand erbij.
+`--host` kiest het adres, `--allow-remote` zet de hostcontrole uit — zonder die
+twee weigert de server elk verzoek dat niet van deze machine komt.
 
-**Of**: start het met `--remote` en open `http://100.96.31.24:8787`. Dan staat het
-op je Tailscale-netwerk. Alleen doen als je dat bewust wilt.
+**Alternatief, als je liever een tunnel gebruikt** (of als de MagicDNS-naam
+even niet resolve't):
+
+```bash
+ssh -N -L 8787:100.96.31.24:8787 ubuntu@100.96.31.24
+```
+
+Let op het tweede adres: de tunnel moet naar het Tailscale-adres wijzen, want
+daar luistert de service — niet op localhost. Daarna is
+<http://127.0.0.1:8787/stage> bereikbaar op je laptop. `tunnel.cmd` doet
+hetzelfde met één dubbelklik.
+
+Wil je terug naar de veilige stand (alleen bereikbaar op de mini-pc zelf), haal
+dan `--host 100.96.31.24 --allow-remote` uit de unit en herstart hem.
 
 ## Starten en stoppen
 

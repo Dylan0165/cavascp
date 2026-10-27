@@ -7,15 +7,65 @@
  * Alles moet geweigerd worden. Daarna controleren we dat het dashboard zelf
  * gewoon werkt.
  *
- * Draait tegen de server op poort 8787.
+ * Start zijn eigen server. Dat is bewust: het draaiende dashboard luistert op
+ * het Tailscale-adres (zodat je er vanaf je laptop bij kunt) en heeft de
+ * hostcontrole uitstaan. Juist die controle wordt hier getest, dus de test
+ * moet een instantie hebben in de standaardstand — anders test hij niets.
  *
- *   node test-security.mjs
+ *   node test-security.mjs            # start zelf een server op poort 8799
+ *   CAVASCP_PORT=8787 node test-security.mjs   # tegen een bestaande server
  */
 
 import { createConnection } from 'node:net';
+import { spawn } from 'node:child_process';
+import { fileURLToPath } from 'node:url';
+import path from 'node:path';
 
-const PORT = process.env.CAVASCP_PORT || 8787;
+const HIER = path.dirname(fileURLToPath(import.meta.url));
+const PORT = Number(process.env.CAVASCP_PORT || 8799);
 const BASE = `http://127.0.0.1:${PORT}`;
+
+/* Zonder CAVASCP_PORT zoeken we een eigen server, op een eigen poort. */
+let eigenServer = null;
+if (!process.env.CAVASCP_PORT) {
+  eigenServer = spawn(process.execPath, ['server.mjs', '--port', String(PORT)], {
+    cwd: HIER,
+    stdio: 'ignore',
+    env: { ...process.env, CAVASCP_PORT: String(PORT) },
+  });
+  procesOpruimen(eigenServer);
+
+  let online = false;
+  for (let i = 0; i < 40; i += 1) {
+    await new Promise((r) => setTimeout(r, 250));
+    try {
+      await fetch(BASE + '/', { redirect: 'manual' });
+      online = true;
+      break;
+    } catch {
+      /* nog niet op */
+    }
+  }
+  if (!online) {
+    console.log('kon geen testserver starten op poort ' + PORT);
+    process.exit(1);
+  }
+}
+
+function procesOpruimen(kind) {
+  const stop = () => {
+    try {
+      kind.kill();
+    } catch {
+      /* al weg */
+    }
+  };
+  process.on('exit', stop);
+  process.on('SIGINT', () => {
+    stop();
+    process.exit(130);
+  });
+}
 
 const results = [];
 const check = (label, ok, detail = '') => {
