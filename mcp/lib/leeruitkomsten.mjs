@@ -38,6 +38,8 @@
 
 import { readFileSync } from 'node:fs';
 
+import { inData } from './paden.mjs';
+
 /* ─────────────────────────── de zes uitkomsten ─────────────────────────── */
 
 /**
@@ -166,7 +168,7 @@ export const LEERUITKOMSTEN = [
  * Is het bestand er niet, dan vallen we terug op de id's die hierboven staan.
  * Dat is dezelfde familie (485380-485385), maar dan zonder de controle.
  */
-export function leesKoppeling({ pad = 'D:/cavascp/data/lo-koppeling.json' } = {}) {
+export function leesKoppeling({ pad = inData('lo-koppeling.json') } = {}) {
   try {
     const data = JSON.parse(readFileSync(pad, 'utf8'));
     const perCode = new Map();

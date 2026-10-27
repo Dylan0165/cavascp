@@ -14,9 +14,10 @@
  */
 
 import { readdirSync, readFileSync, writeFileSync, mkdirSync, existsSync, renameSync, unlinkSync } from 'node:fs';
+import { inData } from '../../mcp/lib/paden.mjs';
 import path from 'node:path';
 
-const DOCUMENTEN = 'D:/cavascp/data/documenten';
+const DOCUMENTEN = inData('documenten');
 
 function zorgVoorMap() {
   if (!existsSync(DOCUMENTEN)) mkdirSync(DOCUMENTEN, { recursive: true });
@@ -261,7 +262,7 @@ export { DOCUMENTEN };
  * Bewust een eigen map en niet de documentenmap: dit zijn vluchtige bestanden
  * die na het versturen weer weggaan. Ze horen niet tussen je documenten.
  */
-export const TIJDELIJK = 'D:/cavascp/data/tijdelijk';
+export const TIJDELIJK = inData('tijdelijk');
 
 export function zorgVoorTijdelijk() {
   if (!existsSync(TIJDELIJK)) mkdirSync(TIJDELIJK, { recursive: true });

@@ -1,0 +1,13 @@
+Paden niet meer hardgecodeerd: het project werkt nu op elke machine
+
+De paden stonden vast als D:/cavascp/... . Zodra je het project ergens anders
+neerzet — een Linux-mini-pc, een andere schijf — breekt het, en dan krijg je
+alleen "geen Canvas-token gevonden" zonder dat duidelijk is waarom. Dat gebeurde
+ook echt bij het overzetten naar de mini-pc.
+
+Nieuw: mcp/lib/paden.mjs rekent het projectpad uit vanuit het bestand zelf, met
+CAVASCP_ROOT als je het wilt overschrijven. Alle hardgecodeerde paden in de
+kern, de MCP-server en de ontwikkeltools zijn vervangen.
+
+Verder: tools/strip-bom.mjs, omdat PowerShell 5.1 bij Set-Content een BOM
+schrijft waar Node op stukloopt.

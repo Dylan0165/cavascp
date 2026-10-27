@@ -27,8 +27,9 @@ import path from 'node:path';
 
 import { htmlToText } from './analysis.mjs';
 import { fetchCourseProfiles, rankCourses } from './courses.mjs';
+import { inData } from './paden.mjs';
 
-const STATE_DIR = 'D:/cavascp/data';
+const STATE_DIR = inData();
 const STATE_FILE = path.join(STATE_DIR, 'canvas-state.json');
 
 /* ─────────────────────── announcements begrijpen ──────────────────────── */

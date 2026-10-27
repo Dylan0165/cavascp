@@ -7,25 +7,26 @@
  *
  * The token is passed only through the child's env (mirroring the `env:` block
  * in cordis.patch.yml), so this also proves the server does not depend on
- * reading D:/cavascp/.env at runtime.
+ * reading .env in de projectmap at runtime.
  */
 
 import { spawn } from 'node:child_process';
 import { readFileSync } from 'node:fs';
+import { ENV_PAD, inProject } from './lib/paden.mjs';
 
-const token = readFileSync('D:/cavascp/.env', 'utf8')
+const token = readFileSync(ENV_PAD, 'utf8')
   .split(/\r?\n/)
   .find((l) => l.startsWith('CANVAS_TOKEN='))
   ?.slice('CANVAS_TOKEN='.length)
   .trim();
 
 if (!token) {
-  console.error('no CANVAS_TOKEN found in D:/cavascp/.env');
+  console.error('no CANVAS_TOKEN found in .env in de projectmap');
   process.exit(1);
 }
 
 const child = spawn(process.execPath, ['server.mjs'], {
-  cwd: 'D:/cavascp/mcp',
+  cwd: inProject('mcp'),
   stdio: ['pipe', 'pipe', 'pipe'],
   env: { ...process.env, CANVAS_TOKEN: token },
 });

@@ -16,6 +16,7 @@
  */
 
 import { existsSync } from 'node:fs';
+import { ENV_PAD, inData, inProject } from '../mcp/lib/paden.mjs';
 import {
   checkLeeruitkomsten,
   checkDocument,
@@ -146,7 +147,7 @@ console.log('\n2) Randgevallen');
 /* ── DEEL 2: de koppeling naar Portflow ─────────────────────────────────── */
 
 console.log('\n3) De koppeling naar Portflow-doelen');
-const KOPPEL_PAD = 'D:/cavascp/data/lo-koppeling.json';
+const KOPPEL_PAD = inData('lo-koppeling.json');
 
 if (!existsSync(KOPPEL_PAD)) {
   check('koppelingsbestand bestaat', false, 'draai eerst: node tools/koppel-leeruitkomsten.mjs --schrijf');

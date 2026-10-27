@@ -14,11 +14,12 @@
  * Config via env:
  *   CANVAS_TOKEN      verplicht (of aanwezig in CANVAS_ENV_FILE)
  *   CANVAS_BASE_URL   default https://fhict.instructure.com
- *   CANVAS_ENV_FILE   default D:/cavascp/.env
+ *   CANVAS_ENV_FILE   default: het .env-bestand in de projectmap
  *   CAVASCP_CACHE_MS  default 600000 (10 minuten)
  */
 
 import { createCanvas, loadEnvFile, CanvasError } from './lib/canvas.mjs';
+import { ENV_PAD } from './lib/paden.mjs';
 import {
   fetchPortfolioAssignments,
   buildCriterionCoverage,
@@ -30,7 +31,7 @@ import {
 const SERVER_NAME = 'cavascp';
 const SERVER_VERSION = '1.0.0';
 const PROTOCOL_VERSION = '2024-11-05';
-const DEFAULT_ENV_FILE = 'D:/cavascp/.env';
+const DEFAULT_ENV_FILE = ENV_PAD;
 
 /* ────────────────────────────── formatting ─────────────────────────────── */
 

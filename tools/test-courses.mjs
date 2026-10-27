@@ -13,10 +13,11 @@
 import { loadEnvFile, createCanvas } from '../mcp/lib/canvas.mjs';
 import { fetchPortfolioAssignments } from '../mcp/lib/analysis.mjs';
 import { fetchCourseProfiles, rankCourses, matchOutcome } from '../mcp/lib/courses.mjs';
+import { ENV_PAD } from '../mcp/lib/paden.mjs';
 
 const onlyCourse = process.argv[2] ? Number(process.argv[2]) : null;
 
-const env = await loadEnvFile('D:/cavascp/.env');
+const env = await loadEnvFile(ENV_PAD);
 const canvas = createCanvas({ baseUrl: env.CANVAS_BASE_URL, token: env.CANVAS_TOKEN });
 
 console.log('Portfolio-opdrachten ophalen (voor de deadline-koppeling)…');

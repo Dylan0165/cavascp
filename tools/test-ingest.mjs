@@ -12,6 +12,7 @@
 import { readAnnouncement, scanCanvas, attentionItems } from '../mcp/lib/ingest.mjs';
 import { loadEnvFile, createCanvas } from '../mcp/lib/canvas.mjs';
 import { fetchPortfolioAssignments } from '../mcp/lib/analysis.mjs';
+import { ENV_PAD, inData } from '../mcp/lib/paden.mjs';
 
 const LIVE = process.argv.includes('--live');
 const results = [];
@@ -127,11 +128,11 @@ if (LIVE) {
   // nabootsen. Zonder dat is er niets "nieuw" en test je de detectie niet.
   if (process.argv.includes('--fresh')) {
     const { rm } = await import('node:fs/promises');
-    await rm('D:/cavascp/data/canvas-state.json', { force: true });
+    await rm(inData('canvas-state.json'), { force: true });
     console.log('  momentopname gewist — dit is een eerste start');
   }
 
-  const env = await loadEnvFile('D:/cavascp/.env');
+  const env = await loadEnvFile(ENV_PAD);
   const canvas = createCanvas({ baseUrl: env.CANVAS_BASE_URL, token: env.CANVAS_TOKEN });
   const assignments = await fetchPortfolioAssignments(canvas, { includeDescriptions: false });
 

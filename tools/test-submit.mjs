@@ -19,6 +19,7 @@
  */
 
 import { writeFile, mkdir } from 'node:fs/promises';
+import { ENV_PAD, inData, inProject } from '../mcp/lib/paden.mjs';
 import { loadEnvFile, createCanvas } from '../mcp/lib/canvas.mjs';
 import { submitFile } from '../mcp/lib/submit.mjs';
 
@@ -33,7 +34,7 @@ const check = (label, ok, detail = '') => {
   console.log(`  ${ok ? 'PASS' : 'FAIL'}  ${label}${detail ? ` — ${detail}` : ''}`);
 };
 
-const env = await loadEnvFile('D:/cavascp/.env');
+const env = await loadEnvFile(ENV_PAD);
 const canvas = createCanvas({ baseUrl: env.CANVAS_BASE_URL, token: env.CANVAS_TOKEN });
 
 /* Een klein, herkenbaar testbestand. */

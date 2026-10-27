@@ -13,11 +13,12 @@
  */
 
 import { loadEnvFile, createCanvas } from '../mcp/lib/canvas.mjs';
+import { ENV_PAD } from '../mcp/lib/paden.mjs';
 
 const COURSE_ID = 14094;
 const ASSIGNMENT_ID = 244979;
 
-const env = await loadEnvFile('D:/cavascp/.env');
+const env = await loadEnvFile(ENV_PAD);
 const canvas = createCanvas({ baseUrl: env.CANVAS_BASE_URL, token: env.CANVAS_TOKEN });
 
 const TYPES = [

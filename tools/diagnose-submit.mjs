@@ -20,8 +20,9 @@
  */
 
 import { loadEnvFile, createCanvas } from '../mcp/lib/canvas.mjs';
+import { ENV_PAD } from '../mcp/lib/paden.mjs';
 
-const env = await loadEnvFile('D:/cavascp/.env');
+const env = await loadEnvFile(ENV_PAD);
 const canvas = createCanvas({ baseUrl: env.CANVAS_BASE_URL, token: env.CANVAS_TOKEN });
 
 /** De opdracht waar het echt om gaat: V-OL-MAIFS, 9 oktober. */

@@ -2,8 +2,9 @@
 /** Isolate why submission state comes back as "unsubmitted" for everything. */
 
 import { createCanvas, loadEnvFile } from './lib/canvas.mjs';
+import { ENV_PAD } from './lib/paden.mjs';
 
-const env = await loadEnvFile('D:/cavascp/.env');
+const env = await loadEnvFile(ENV_PAD);
 const canvas = createCanvas({ baseUrl: env.CANVAS_BASE_URL, token: env.CANVAS_TOKEN });
 
 const COURSE = 15973; // V-OL-MAIFS — has "Eerste portfolio" submitted

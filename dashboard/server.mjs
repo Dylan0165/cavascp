@@ -24,6 +24,7 @@ import { spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 
 import { createCanvas, loadEnvFile } from '../mcp/lib/canvas.mjs';
+import { ENV_PAD, inProject } from '../mcp/lib/paden.mjs';
 import { fetchPortfolioAssignments, buildCriterionCoverage } from '../mcp/lib/analysis.mjs';
 import { parseTermCode, currentTermCode, groupBySemester } from '../mcp/lib/semesters.mjs';
 import { kravaStatus, kravaProjectenVanSchijf, kravaProjectVanSchijf, startKrava } from '../mcp/lib/krava.mjs';
@@ -40,7 +41,12 @@ const STATE_FILE = path.join(HERE, 'state.json');
 // of the real one.
 const DOC_DIR = process.env.CAVASCP_DOC_DIR || HERE;
 const DOC_INDEX = process.env.CAVASCP_DOC_INDEX || path.join(DOC_DIR, 'documents.json');
-const ENV_FILE = process.env.CANVAS_ENV_FILE || 'D:/cavascp/.env';
+/*
+ * Het .env-pad komt uit paden.mjs en niet uit een vaste letter. Op een andere
+ * machine of schijf — bijvoorbeeld een Linux-mini-pc — bestaat D:/cavascp niet,
+ * en dan werkt de server wel maar heeft hij geen token.
+ */
+const ENV_FILE = ENV_PAD;
 
 const args = process.argv.slice(2);
 const portArg = args.indexOf('--port');
