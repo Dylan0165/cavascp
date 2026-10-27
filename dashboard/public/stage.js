@@ -110,6 +110,7 @@ function renderKop() {
   if (!o) return;
 
   $('#quota').textContent = `${o.gedaan} / ${o.limiet} vandaag`;
+  $('#gmail').textContent = o.gmail?.gekoppeld ? `Gmail: ${o.gmail.gebruiker}` : 'Gmail niet gekoppeld';
 
   const stage = o.profiel?.stage ?? {};
   const delen = [
@@ -127,6 +128,11 @@ function renderKop() {
    * zaait een verwachting die je niet kunt nakomen. Dus zeggen we het hier —
    * vóór je op verzenden drukt, niet erna.
    */
+  const teVersturen = (o.teVersturen ?? []).length;
+  const allesKnop = $('#verstuur-alles');
+  allesKnop.hidden = !(o.gmail?.gekoppeld && teVersturen > 0);
+  allesKnop.textContent = teVersturen ? `Verstuur goedgekeurd (${teVersturen})` : 'Verstuur goedgekeurd';
+
   const dagen = stage.dagenPerWeek;
   const eisen = $('#eisen');
   if (dagen && dagen < 5) {
@@ -292,6 +298,15 @@ function renderDetail() {
     }
     host.append(oordeel);
 
+    if (b.verzending) {
+      const verzonden = document.createElement('p');
+      verzonden.className = 'leeg';
+      verzonden.style.marginTop = '.75rem';
+      const wanneer = new Date(b.verzending.op).toLocaleString('nl-NL');
+      verzonden.textContent = `Verstuurd op ${wanneer} naar ${b.verzending.naar}.`;
+      host.append(verzonden);
+    }
+
     if (b.mail.waarom) {
       const waarom = document.createElement('p');
       waarom.className = 'leeg';
@@ -317,10 +332,21 @@ function renderDetail() {
       knop('Lees en schrijf', () => scanEen(b.id), 'btn'),
     );
   } else {
+    const kanVersturen = ['concept', 'goedgekeurd'].includes(b.status) && (b.emails ?? []).length > 0;
+    const verstuurKnop = knop(
+      b.status === 'verstuurd' ? 'Al verstuurd' : `Verstuur naar ${b.emails?.[0] ?? '—'}`,
+      () => verstuur(b),
+      'btn',
+    );
+    verstuurKnop.disabled = !kanVersturen || !state.overzicht?.gmail?.gekoppeld;
+    if (!state.overzicht?.gmail?.gekoppeld) {
+      verstuurKnop.title = 'Gmail is nog niet gekoppeld — zie docs/stagebot.md';
+    }
+
     acties.append(
-      knop('Kopieer mail', () => kopieer(b.mail.volledig), 'btn'),
+      verstuurKnop,
+      knop('Kopieer mail', () => kopieer(b.mail.volledig), 'btn btn--ghost'),
       knop('Goedgekeurd', () => zetStatus(b.id, 'goedgekeurd'), 'btn btn--ghost'),
-      knop('Verstuurd', () => zetStatus(b.id, 'verstuurd'), 'btn btn--ghost'),
       knop('Afgewezen', () => zetStatus(b.id, 'afgewezen'), 'btn btn--ghost'),
       knop('Opnieuw schrijven', () => scanEen(b.id), 'btn btn--ghost'),
     );
@@ -362,6 +388,58 @@ async function zetStatus(id, status) {
   await selecteer(id);
   renderLijst();
   renderKop();
+}
+
+async function verstuur(b) {
+  if (state.bezig) return;
+  const naar = (b.emails ?? [])[0];
+  if (!naar) {
+    melding('Geen e-mailadres bekend voor dit bedrijf.', 'fout');
+    return;
+  }
+  if (!window.confirm(`Mail versturen naar ${naar}?\n\nOnderwerp: ${b.mail?.onderwerp ?? '—'}`)) return;
+
+  state.bezig = true;
+  voortgang('Versturen…');
+  try {
+    const { overzicht, naar: verzonden } = await api('/api/stage/verstuur', { body: { id: b.id } });
+    state.overzicht = overzicht;
+    await selecteer(b.id);
+    renderKop();
+    renderLijst();
+    melding(`Verstuurd naar ${verzonden}.`);
+  } catch (fout) {
+    melding(fout.message, 'fout');
+  } finally {
+    state.bezig = false;
+    voortgang('');
+  }
+}
+
+async function verstuurAlles() {
+  if (state.bezig) return;
+  const klaar = state.overzicht?.teVersturen ?? [];
+  if (!klaar.length) return;
+  if (!window.confirm(`${klaar.length} mails versturen?`)) return;
+
+  state.bezig = true;
+  voortgang(`Versturen: ${klaar.length} mails…`);
+  try {
+    const { overzicht, verstuurd = [], mislukt = [] } = await api('/api/stage/verstuur-alles', {
+      body: {},
+    });
+    state.overzicht = overzicht;
+    renderAlles();
+    melding(
+      `${verstuurd.length} verstuurd${mislukt.length ? `, ${mislukt.length} mislukt: ${mislukt.map((m) => m.bedrijf).join(', ')}` : ''}.`,
+      mislukt.length ? 'fout' : 'info',
+    );
+  } catch (fout) {
+    melding(fout.message, 'fout');
+  } finally {
+    state.bezig = false;
+    voortgang('');
+  }
 }
 
 async function scanEen(id) {
@@ -496,6 +574,7 @@ function start() {
   }
 
   $('#dagrun').addEventListener('click', dagrun);
+  $('#verstuur-alles').addEventListener('click', verstuurAlles);
   $('#aanvoer-eigen').addEventListener('click', () => zoek('eigen'));
   $('#aanvoer-osm').addEventListener('click', () => zoek('osm'));
 

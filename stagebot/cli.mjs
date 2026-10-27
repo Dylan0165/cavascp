@@ -17,6 +17,8 @@ import { leesProfiel, bewaarProfiel, profielAlsTekst, verrijkVanuitCanvas } from
 import { aiBeschikbaar, vindSleutel } from './lib/deepseek.mjs';
 import { zoekBedrijven, voegKandidatenToe, seedKandidaten, voegUrlToe } from './lib/zoeken.mjs';
 import { leesEnSchrijf } from './lib/pijplijn.mjs';
+import { verstuurBedrijf, verstuurGoedgekeurd, kiesAdres } from './lib/versturen.mjs';
+import { vindGmailSleutels } from './lib/gmail.mjs';
 import { readFileSync } from 'node:fs';
 
 const [, , commando, ...rest] = process.argv;
@@ -31,6 +33,9 @@ function gebruik() {
     node stagebot/cli.mjs zoek            bedrijven zoeken in de regio (OSM + je eigen lijst)
     node stagebot/cli.mjs dag             twintig kandidaten lezen en mail schrijven
     node stagebot/cli.mjs status          wat staat er in de wachtrij, en hoe ver is vandaag
+    node stagebot/cli.mjs gmail           is Gmail gekoppeld? (--test stuurt een proefmail)
+    node stagebot/cli.mjs verstuur <id>   de mail van dat bedrijf echt versturen
+    node stagebot/cli.mjs verstuur --alles alles wat goedgekeurd is
     node stagebot/cli.mjs voeg <url>      zelf een bedrijf toevoegen
     node stagebot/cli.mjs scan <url>      een bedrijf lezen en bewaren
     node stagebot/cli.mjs scan <url> --tekst <bestand>
@@ -162,6 +167,78 @@ async function main() {
       for (const m of mislukt) console.log(`     ${m.bedrijf}: ${m.fout}`);
       console.log(`  Nog ${dagTelling().over} van vandaag over. Open het dashboard om na te kijken.\n`);
       return gelukt ? 0 : 1;
+    }
+
+    case 'gmail': {
+      const sleutels = vindGmailSleutels();
+      if (!sleutels) {
+        console.log('\n  Gmail is nog niet gekoppeld.');
+        console.log('  Zet in .env:');
+        console.log('    GMAIL_USER=dylanschuurman04@gmail.com');
+        console.log('    GMAIL_APP_PASSWORD=xxxx xxxx xxxx xxxx');
+        console.log('  Een app-wachtwoord maak je op https://myaccount.google.com/apppasswords');
+        console.log('  (tweestapsverificatie moet aan staan).\n');
+        return 1;
+      }
+
+      console.log(`\n  Gmail: ${sleutels.gebruiker}`);
+      console.log(`  Sleutel uit: ${sleutels.bron} (${sleutels.wachtwoord.length} tekens)`);
+      if (!sleutels.alleenLeesbaarVoorJou) {
+        console.log('  LET OP: dat bestand is leesbaar voor andere gebruikers op deze machine.');
+      }
+
+      if (rest.includes('--test')) {
+        const { verstuurMail } = await import('./lib/gmail.mjs');
+        console.log('  Proefmail naar jezelf sturen…');
+        await verstuurMail({
+          van: sleutels.gebruiker,
+          vanNaam: 'Stagebot',
+          aan: sleutels.gebruiker,
+          onderwerp: 'Proef: de stagebot kan mailen',
+          tekst: 'Deze mail is verstuurd door de stagebot om te controleren of de koppeling werkt.\n\nAls je dit leest, is het gelukt.',
+        });
+        console.log('  Verstuurd. Kijk in je inbox (en in spam, de eerste keer).\n');
+        return 0;
+      }
+
+      console.log('\n  Probeer het met: node stagebot/cli.mjs gmail --test\n');
+      return 0;
+    }
+
+    case 'verstuur': {
+      const alles = rest.includes('--alles');
+
+      if (alles) {
+        if (!rest.includes('--ja')) {
+          console.log('\n  Dit verstuurt alle mails met status "goedgekeurd".');
+          console.log('  Zeker weten? Voeg --ja toe: node stagebot/cli.mjs verstuur --alles --ja\n');
+          return 1;
+        }
+        const { klaar, mislukt } = await verstuurGoedgekeurd();
+        console.log(`\n  ${klaar.length} verstuurd, ${mislukt.length} mislukt`);
+        for (const k of klaar) console.log(`     ✓ ${k.naar}`);
+        for (const m of mislukt) console.log(`     ✗ ${m.bedrijf}: ${m.fout}`);
+        console.log('');
+        return mislukt.length ? 1 : 0;
+      }
+
+      const id = rest[0];
+      if (!id) {
+        console.log('  welk bedrijf? bijvoorbeeld: node stagebot/cli.mjs verstuur daemen-ict');
+        return 1;
+      }
+
+      const bedrijf = zoekBedrijf(id);
+      if (!bedrijf) {
+        console.log(`  geen bedrijf gevonden voor "${id}"`);
+        return 1;
+      }
+      const adres = kiesAdres(bedrijf);
+      console.log(`\n  Versturen naar ${adres ?? 'geen adres'} — ${bedrijf.titel}`);
+      const { naar, messageId } = await verstuurBedrijf(bedrijf.id);
+      console.log(`  Verstuurd naar ${naar}`);
+      console.log(`  Message-ID: ${messageId}\n`);
+      return 0;
     }
 
     case 'scan': {

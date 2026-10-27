@@ -124,12 +124,60 @@ het bovenaan, en daarom belooft geen enkele mail een aantal dagen: je kunt een
 bedrijf niet drie dagen aanbieden en er later achter komen dat het niet mag.
 Regel het met je stagecoördinator vóór je verstuurt.
 
+## Gmail koppelen
+
+De stagebot verstuurt via de SMTP-server van Gmail, met een **app-wachtwoord**.
+Geen OAuth, geen Google Cloud-project: één string van zestien tekens die je in
+`.env` zet en die je met één klik kunt intrekken.
+
+1. Zet **tweestapsverificatie** aan op je Google-account. Zonder dat bestaat er
+   geen app-wachtwoord.
+2. Ga naar <https://myaccount.google.com/apppasswords>, noem het "stagebot" en
+   kopieer de zestien tekens.
+3. Zet ze in `.env`:
+
+   ```
+   GMAIL_USER=dylanschuurman04@gmail.com
+   GMAIL_APP_PASSWORD=abcd efgh ijkl mnop
+   ```
+
+   Spaties mogen; die haalt de code eruit.
+4. Test met een proefmail naar jezelf:
+
+   ```
+   node stagebot/cli.mjs gmail --test
+   ```
+
+Daarna wordt de knop **Verstuur naar …** actief in het scherm, en verschijnt
+**Verstuur goedgekeurd (n)** zodra er mails op goedgekeurd staan.
+
+Wat er met een verzending gebeurt:
+
+| Stap | Wat |
+|---|---|
+| je drukt op versturen | bevestigingsvraag met het adres en het onderwerp |
+| de mail gaat de deur uit | SMTP naar smtp.gmail.com:465, inloggen met het app-wachtwoord |
+| de server accepteert | pas dán gaat de status op "verstuurd", met tijd en Message-ID |
+| de server weigert | de mail blijft staan, de fout komt in beeld |
+
+De status gaat dus **niet** op verstuurd als het verzenden mislukte — anders staat
+er een vinkje bij een mail die nooit aankwam.
+
+Twee dingen om te weten:
+
+- **De eerste keer in spam.** Een nieuw afzenderadres met een zakelijke mail
+  belandt vaak in spam. Vraag het bedrijf desnoods om je adres toe te voegen, of
+  bel na een week.
+- **Grens van Gmail.** Een gratis account mag ongeveer 500 ontvangers per dag
+  hebben. Twintig is daar ver onder — en dat is precies de bedoeling.
+
 ## Wat de bot niet doet
 
-**Hij verstuurt niets.** Er is geen verzendfunctie. Je krijgt de mail te zien en
-kopieert hem naar je eigen mailprogramma. Dat is bewust: een stagezoektocht gaat
-over mensen, en als er iets misgaat wil je dat het jouw fout was en niet die van
-een script.
+**Hij verstuurt niet zonder jou.** De knop vraagt eerst om bevestiging met het
+adres en het onderwerp erbij. En `verstuur --alles` pakt alleen mails met status
+"goedgekeurd" — wat je nog niet hebt nagekeken blijft liggen. Een script dat
+zelfstandig twintig koude mails per dag de deur uit doet, is een script dat op
+een ochtend je adres verpest.
 
 **Hij verzint niets over je.** Staat er geen project in je profiel, dan noemt de
 mail er geen. De prompt verbiedt het, en `keurMail()` controleert erop.
@@ -162,19 +210,24 @@ een knop zitten.
 
 ## Wat er nog niet is
 
-- **Versturen.** Bewust niet gebouwd. Zie hierboven.
-- **Opvolgen.** Nog geen herinnering na een week, en geen overzicht van wie
-  antwoordde. De status per bedrijf wordt wel bijgehouden.
-- **Zoeken.** Je moet zelf een bedrijf aandragen; de bot leest het alleen.
-- **Een scherm.** De stagebot is nu een commandoregel. Een tabblad in het
-  dashboard zou mooier zijn, maar dan moet eerst blijken dat je hem gebruikt.
+- **Opvolgen.** Geen herinnering na een week, en geen overzicht van wie al
+  antwoord gaf. De status per bedrijf wordt wel bijgehouden, dus je kunt het
+  met de hand zien — maar de bot tikt je niet op de schouder.
+- **Antwoorden inlezen.** Je zet "geantwoord" zelf; de bot leest je inbox niet.
+- **Bounces.** Een mail naar een dood adres komt nu niet terug in beeld.
+- **Meerdere contactpersonen per bedrijf.** Nu is het één adres.
 
 ## Testen
 
 ```
 node stagebot/test-stagebot.mjs   # tekst, e-mail, tech, mailopmaak (38 checks)
 node stagebot/test-queue.mjs      # afstand, OV, wachtrij, daglimiet (23 checks)
+node stagebot/test-smtp.mjs       # het mailgesprek, tegen een nepserver (11 checks)
 ```
+
+De SMTP-test start een eigen server op een vrije poort en leest mee wat de
+client stuurt. Er gaat dus geen echte mail de deur uit, en je hoeft geen
+wachtwoord te hebben om te controleren of versturen werkt.
 
 De tweede reeks draait in een tijdelijke datamap (`CAVASCP_DATA_DIR`), zodat een
 test je echte bedrijvenlijst nooit kan overschrijven.

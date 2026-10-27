@@ -5,7 +5,7 @@ Drie onderdelen, op één analyse-laag:
 - een **lokaal dashboard** — je portfolio, je documenten en je stage-outreach in de browser
 - een **MCP-server** — vraag het vanuit de chat
 - een **Portflow-brug** — zet een document met één klik in je portfolio
-- een **stagebot** — bedrijven vinden, lezen en mailen voor je stage
+- een **stagebot** — bedrijven vinden, lezen, mailen en versturen voor je stage
 
 Canvas wordt volledig automatisch gelezen met een persoonlijk API-token.
 Portflow gaat via een echte browser, omdat daar geen publieke API voor is.
@@ -141,7 +141,7 @@ programma op je pc kan de API uitlezen. Daarom zit er een toegangslaag op
 | `--allow-remote` moet je bewust meegeven | Idem; zonder die vlag komt er niets van buiten door |
 | Rem op dure routes (10 per minuut) | Een script dat honderden browsers start |
 | `Referrer-Policy: no-referrer`, `nosniff`, `X-Frame-Options: DENY`, CORP | Meekijken, MIME-verwarring, inlijsten |
-| `.env` alleen leesbaar voor jou, SYSTEM en Administrators | Een tweede account op je pc dat je Canvas-token leest |
+| `.env` alleen leesbaar voor jou (`chmod 600`) | Een tweede account op je pc dat je Canvas-token of Gmail-app-wachtwoord leest |
 
 Wat dit **niet** doet: iemand met volledige toegang tot je Windows-account kan
 nog steeds bij je bestanden. Daar is geen omheen te werken — dat is de reden dat
@@ -307,6 +307,7 @@ node shot-drawer.mjs     # screenshot van het detailpaneel
 cd ../stagebot
 node test-stagebot.mjs   # tekst, e-mail, tech, mailopmaak (38 checks)
 node test-queue.mjs      # afstand, OV, wachtrij, daglimiet (23 checks)
+node test-smtp.mjs       # het mailgesprek, tegen een nepserver (11 checks)
 
 cd ../browser
 node smoke-browser.mjs   # browser, profiel en Canvas-bereik

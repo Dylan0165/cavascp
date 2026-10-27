@@ -47,6 +47,8 @@ import {
 import { zoekBedrijven, voegKandidatenToe, seedKandidaten, voegUrlToe } from '../stagebot/lib/zoeken.mjs';
 import { leesEnSchrijf } from '../stagebot/lib/pijplijn.mjs';
 import { keurMail } from '../stagebot/lib/mail.mjs';
+import { verstuurBedrijf, verstuurGoedgekeurd, kiesAdres } from '../stagebot/lib/versturen.mjs';
+import { gmailBeschikbaar, vindGmailSleutels } from '../stagebot/lib/gmail.mjs';
 import { leesProfiel } from '../stagebot/lib/profiel.mjs';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
@@ -585,6 +587,8 @@ function stageLicht(b) {
     // en kost hier niets extra.
     keuring: b.keuring ?? (b.mail ? keurMail(b.mail) : null),
     notitie: (b.notities ?? []).slice(-1)[0]?.tekst ?? null,
+    verstuurbaar: ['concept', 'goedgekeurd'].includes(b.status) && Boolean(kiesAdres(b)),
+    verzending: b.verzending ?? null,
   };
 }
 
@@ -603,9 +607,13 @@ function stageOverzicht() {
     wachtrij: wachtrij({ limiet: 100 }).map(stageLicht),
     vandaag: alle.filter((b) => b.dag === telling.dag).map(stageLicht),
     teBeoordelen: alle.filter((b) => b.status === 'concept').map(stageLicht),
+    teVersturen: alle.filter((b) => b.status === 'goedgekeurd').map(stageLicht),
     verstuurd: alle
       .filter((b) => ['verstuurd', 'geantwoord', 'gesprek', 'klaar'].includes(b.status))
       .map(stageLicht),
+    gmail: gmailBeschikbaar()
+      ? { gekoppeld: true, gebruiker: vindGmailSleutels()?.gebruiker ?? null }
+      : { gekoppeld: false, gebruiker: null },
     profiel: {
       naam: profiel.naam,
       email: profiel.email,
@@ -1139,6 +1147,45 @@ const server = createServer(async (req, res) => {
         return sendJson(res, 200, {
           bedrijf: stageLicht(bedrijf),
           keuring,
+          overzicht: stageOverzicht(),
+        });
+      } catch (fout) {
+        return sendJson(res, 502, { error: fout.message, overzicht: stageOverzicht() });
+      }
+    }
+
+    /*
+     * Versturen. Dit is de enige route die iets onomkeerbaars doet, dus hij
+     * heeft een eigen rem en hij verstuurt alleen wat je zelf hebt goedgekeurd
+     * (of wat je hier expliciet aanwijst).
+     */
+    if (pathname === '/api/stage/verstuur' && req.method === 'POST') {
+      if (!security.rateLimitOk({ emmer: 'mail', limiet: 20 })) {
+        return sendJson(res, 429, { error: 'Te veel mails binnen een minuut. Even wachten.' });
+      }
+      const body = await readBody(req);
+      try {
+        const { bedrijf, naar, messageId } = await verstuurBedrijf(String(body.id ?? ''));
+        return sendJson(res, 200, {
+          bedrijf: stageLicht(bedrijf),
+          naar,
+          messageId,
+          overzicht: stageOverzicht(),
+        });
+      } catch (fout) {
+        return sendJson(res, 502, { error: fout.message, overzicht: stageOverzicht() });
+      }
+    }
+
+    if (pathname === '/api/stage/verstuur-alles' && req.method === 'POST') {
+      if (!security.rateLimitOk({ emmer: 'mail', limiet: 20 })) {
+        return sendJson(res, 429, { error: 'Te veel mails binnen een minuut. Even wachten.' });
+      }
+      try {
+        const { klaar, mislukt } = await verstuurGoedgekeurd({ limiet: 20 });
+        return sendJson(res, mislukt.length ? 207 : 200, {
+          verstuurd: klaar.map((k) => ({ naar: k.naar, bedrijf: k.bedrijf.titel })),
+          mislukt,
           overzicht: stageOverzicht(),
         });
       } catch (fout) {
