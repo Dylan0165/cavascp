@@ -33,6 +33,21 @@ import { checkDocument, naarPortflowGoalIds, semesterMappen } from '../mcp/lib/l
 import { createDocumentStore, parseMultipart } from './lib/documents.mjs';
 import * as werkplek from './lib/documenten.mjs';
 import { createSecurity } from './lib/security.mjs';
+import {
+  leesBedrijven,
+  zoekBedrijf,
+  werkBij,
+  wachtrij,
+  dagTelling,
+  vandaag,
+  telPerStatus,
+  STATUS,
+  DAG_LIMIET,
+} from '../stagebot/lib/bedrijven.mjs';
+import { zoekBedrijven, voegKandidatenToe, seedKandidaten, voegUrlToe } from '../stagebot/lib/zoeken.mjs';
+import { leesEnSchrijf } from '../stagebot/lib/pijplijn.mjs';
+import { keurMail } from '../stagebot/lib/mail.mjs';
+import { leesProfiel } from '../stagebot/lib/profiel.mjs';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const PUBLIC_DIR = path.join(HERE, 'public');
@@ -521,6 +536,70 @@ function runPortflow(args) {
   });
 }
 
+/* ─────────────────────────────── stagebot ──────────────────────────────── */
+
+/**
+ * De lichte vorm van een bedrijf voor de lijst.
+ *
+ * De volledige tekst van een gescande site is tienduizenden tekens; die gaat
+ * niet mee in een overzicht van twintig bedrijven. De mail en de keuring wel,
+ * want dat is wat je op het scherm beoordeelt.
+ */
+function stageLicht(b) {
+  return {
+    id: b.id,
+    titel: b.titel,
+    domein: b.domein,
+    url: b.url,
+    plaats: b.plaats ?? null,
+    straat: b.straat ?? null,
+    ov: b.ov ?? 'onbekend',
+    locatieBron: b.locatieBron ?? null,
+    vanHuisKm: b.vanHuisKm ?? null,
+    station: b.station ?? null,
+    status: b.status,
+    statusLabel: STATUS[b.status] ?? b.status,
+    dag: b.dag ?? null,
+    emails: b.emails ?? [],
+    heeftMail: Boolean(b.mail),
+    onderwerp: b.mail?.onderwerp ?? null,
+    // Oudere mails zijn geschreven voordat we de keuring bewaarden. Toch een
+    // oordeel tonen in plaats van "? woorden": de controle is toch al gedaan
+    // en kost hier niets extra.
+    keuring: b.keuring ?? (b.mail ? keurMail(b.mail) : null),
+    notitie: (b.notities ?? []).slice(-1)[0]?.tekst ?? null,
+  };
+}
+
+function stageOverzicht() {
+  const telling = dagTelling();
+  const alle = leesBedrijven().bedrijven;
+  const profiel = leesProfiel();
+
+  return {
+    dag: telling.dag,
+    limiet: telling.limiet,
+    gedaan: telling.gedaan,
+    over: telling.over,
+    statussen: STATUS,
+    perStatus: telPerStatus().perStatus,
+    wachtrij: wachtrij({ limiet: 100 }).map(stageLicht),
+    vandaag: alle.filter((b) => b.dag === telling.dag).map(stageLicht),
+    teBeoordelen: alle.filter((b) => b.status === 'concept').map(stageLicht),
+    verstuurd: alle
+      .filter((b) => ['verstuurd', 'geantwoord', 'gesprek', 'klaar'].includes(b.status))
+      .map(stageLicht),
+    profiel: {
+      naam: profiel.naam,
+      email: profiel.email,
+      minor: profiel.minor,
+      stage: profiel.stage,
+      projecten: (profiel.projecten ?? []).map((p) => p.naam),
+      vaardigheden: (profiel.vaardigheden ?? []).length,
+    },
+  };
+}
+
 async function serveStatic(req, res, urlPath) {
   const rel = urlPath.replace(/^\/+/, '') || 'index.html';
   // Resolve then verify containment so a crafted path cannot escape public/.
@@ -567,6 +646,16 @@ const server = createServer(async (req, res) => {
     if (pathname === '/dashboard') {
       security.setCookie(res); // verlengt de sessie bij een herlaadbeurt
       return serveStatic(req, res, 'index.html');
+    }
+
+    /*
+     * De stagepagina is een tweede scherm op dezelfde server, dezelfde sessie
+     * en dezelfde gegevens als het portfolio-dashboard. Bewust geen tweede
+     * app: één cookie, één poort, één plek waar het token staat.
+     */
+    if (pathname === '/stage') {
+      security.setCookie(res);
+      return serveStatic(req, res, 'stage.html');
     }
 
     if (pathname.startsWith('/api/') || pathname.startsWith('/_api/')) {
@@ -961,6 +1050,105 @@ const server = createServer(async (req, res) => {
           secties: p.secties,
         })),
       });
+    }
+
+    /* ── stagebot ─────────────────────────────────────────────────────────
+       De outreach-kant. Dit is de enige plek waar het dashboard schrijft
+       buiten state.json en de documenten: bedrijven, mails en statussen staan
+       in data/stagebot/bedrijven.json. Er gaat niets de deur uit — versturen
+       doe je zelf, en dat blijft zo. */
+
+    if (pathname === '/api/stage' && req.method === 'GET') {
+      return sendJson(res, 200, stageOverzicht());
+    }
+
+    if (pathname === '/api/stage/bedrijf' && req.method === 'GET') {
+      const bedrijf = zoekBedrijf(url.searchParams.get('id') ?? '');
+      if (!bedrijf) return sendJson(res, 404, { error: 'onbekend bedrijf' });
+      return sendJson(res, 200, {
+        ...stageLicht(bedrijf),
+        omschrijving: bedrijf.omschrijving ?? '',
+        tech: bedrijf.tech ?? [],
+        stageSignaal: bedrijf.stageSignaal ?? [],
+        paginas: bedrijf.paginas ?? [],
+        mail: bedrijf.mail ?? null,
+        notities: bedrijf.notities ?? [],
+      });
+    }
+
+    if (pathname === '/api/stage/zoek' && req.method === 'POST') {
+      if (!security.rateLimitOk({ emmer: 'stage', limiet: 30 })) {
+        return sendJson(res, 429, { error: 'Te veel dure acties binnen een minuut. Even wachten.' });
+      }
+      const body = await readBody(req);
+      const bron = body.bron === 'osm' || body.bron === 'beide' ? body.bron : 'eigen';
+
+      let toegevoegd = 0;
+      if (bron !== 'osm') toegevoegd += voegKandidatenToe(seedKandidaten()).nieuw.length;
+
+      if (bron !== 'eigen') {
+        try {
+          toegevoegd += voegKandidatenToe(await zoekBedrijven()).nieuw.length;
+        } catch (fout) {
+          // De eigen lijst is dan al toegevoegd; dat draaien we niet terug.
+          return sendJson(res, 502, {
+            error: `OpenStreetMap: ${fout.message}`,
+            toegevoegd,
+            overzicht: stageOverzicht(),
+          });
+        }
+      }
+
+      return sendJson(res, 200, { toegevoegd, overzicht: stageOverzicht() });
+    }
+
+    if (pathname === '/api/stage/voeg' && req.method === 'POST') {
+      const body = await readBody(req);
+      try {
+        const bedrijf = voegUrlToe(String(body.url ?? ''));
+        return sendJson(res, 201, { bedrijf: stageLicht(bedrijf), overzicht: stageOverzicht() });
+      } catch (fout) {
+        return sendJson(res, 400, { error: fout.message });
+      }
+    }
+
+    if (pathname === '/api/stage/scan' && req.method === 'POST') {
+      if (!security.rateLimitOk({ emmer: 'stage', limiet: 30 })) {
+        return sendJson(res, 429, { error: 'Te veel dure acties binnen een minuut. Even wachten.' });
+      }
+      const body = await readBody(req);
+      try {
+        const { bedrijf, keuring } = await leesEnSchrijf(String(body.id ?? ''));
+        return sendJson(res, 200, {
+          bedrijf: stageLicht(bedrijf),
+          keuring,
+          overzicht: stageOverzicht(),
+        });
+      } catch (fout) {
+        return sendJson(res, 502, { error: fout.message, overzicht: stageOverzicht() });
+      }
+    }
+
+    if (pathname === '/api/stage/status' && req.method === 'POST') {
+      const body = await readBody(req);
+      const status = String(body.status ?? '');
+      if (!STATUS[status]) return sendJson(res, 400, { error: `Onbekende status: ${status}` });
+
+      const bijgewerkt = werkBij(String(body.id ?? ''), (b) => {
+        b.status = status;
+        if (status === 'verstuurd' && !(b.verstuurd ?? []).length) {
+          b.verstuurd = [new Date().toISOString()];
+        }
+        if (body.notitie) {
+          b.notities = [
+            ...(b.notities ?? []),
+            { op: new Date().toISOString(), tekst: String(body.notitie) },
+          ];
+        }
+      });
+
+      if (!bijgewerkt) return sendJson(res, 404, { error: 'onbekend bedrijf' });
+      return sendJson(res, 200, { bedrijf: stageLicht(bijgewerkt), overzicht: stageOverzicht() });
     }
 
     if (pathname === '/api/health') {

@@ -46,8 +46,15 @@ export function createSecurity({ port, allowRemote = false, rateLimit = 10 } = {
   /** Alleen het eerste stukje van het token tonen, om te kunnen vergelijken. */
   const fingerprint = sessionToken.slice(0, 8);
 
-  /** Telt dure acties per minuut. */
-  const hits = [];
+  /**
+   * Telt dure acties per minuut, per emmer.
+   *
+   * Twee emmers, niet één: een Portflow-actie start een browser en hoort op
+   * tien per minuut te staan. Een stage-scan haalt een paar pagina's op en is
+   * veel lichter — twintig daarvan in één run mogen niet dezelfde rem raken,
+   * anders zet een dagrun zichzelf na tien bedrijven stil.
+   */
+  const hits = new Map();
   let lastLimitWarning = 0;
 
   function constantTimeEquals(a, b) {
@@ -128,11 +135,16 @@ export function createSecurity({ port, allowRemote = false, rateLimit = 10 } = {
     return constantTimeEquals(url.searchParams.get('k'), sessionToken);
   }
 
-  function rateLimitOk() {
+  function rateLimitOk({ emmer = 'zwaar', limiet = rateLimit } = {}) {
     const now = Date.now();
-    while (hits.length && now - hits[0] > 60_000) hits.shift();
-    if (hits.length >= rateLimit) return false;
-    hits.push(now);
+    const rij = hits.get(emmer) ?? [];
+    while (rij.length && now - rij[0] > 60_000) rij.shift();
+    if (rij.length >= limiet) {
+      hits.set(emmer, rij);
+      return false;
+    }
+    rij.push(now);
+    hits.set(emmer, rij);
     return true;
   }
 

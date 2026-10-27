@@ -1,0 +1,135 @@
+<!doctype html>
+<html lang="nl" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>cavascp — stage</title>
+<meta name="color-scheme" content="dark light">
+<meta name="referrer" content="no-referrer">
+<link rel="stylesheet" href="/styles.css">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='24' fill='%23e2a63f'/><path d='M28 34h44v8H28zm0 14h44v8H28zm0 14h28v8H28z' fill='%231a1408'/></svg>">
+<style>
+  /*
+   * De stagepagina deelt de tokens en knoppen van het dashboard (styles.css)
+   * en heeft alleen hier zijn eigen layout. Geen tweede ontwerpsysteem: de
+   * cijfers, het crème en de rust moeten hetzelfde voelen.
+   */
+  body { margin: 0; background: var(--bg); color: var(--ink); font-family: var(--font-ui); }
+
+  .stage { padding: 1.25rem clamp(1rem, 3vw, 2.5rem) 3rem; max-width: 1500px; margin: 0 auto; }
+
+  .balk {
+    display: flex; flex-wrap: wrap; gap: .75rem; align-items: center;
+    justify-content: space-between; margin-bottom: 1rem;
+  }
+  .balk__groep { display: flex; gap: .5rem; flex-wrap: wrap; align-items: center; }
+
+  .quota { font-family: var(--font-mono); font-variant-numeric: tabular-nums; font-size: var(--text-sm); color: var(--ink-2); }
+  .quota strong { color: var(--ink); font-size: var(--text-lg); }
+
+  .melding {
+    margin: 0 0 1rem; padding: .625rem .875rem; border-radius: .5rem;
+    background: var(--bg-deep); border: 1px solid var(--line); color: var(--ink-2);
+    font-size: var(--text-sm); line-height: 1.5;
+  }
+  .melding[data-soort="fout"] { border-color: var(--clay-500); color: var(--clay-400); }
+
+  .raster { display: grid; grid-template-columns: minmax(320px, 420px) minmax(0, 1fr); gap: 1rem; align-items: start; }
+  @media (max-width: 900px) { .raster { grid-template-columns: 1fr; } }
+
+  .lijst { list-style: none; margin: 0; padding: 0; display: grid; gap: .375rem; max-height: calc(100dvh - 14rem); overflow: auto; }
+  .rij {
+    display: grid; grid-template-columns: 1fr auto; gap: .25rem .5rem;
+    padding: .625rem .75rem; border: 1px solid var(--line); border-radius: .5rem;
+    background: var(--panel, var(--bg-deep)); cursor: pointer; text-align: left;
+    font: inherit; color: inherit; width: 100%;
+  }
+  .rij:hover { border-color: var(--line-strong); }
+  .rij[aria-current="true"] { border-color: var(--green-500); box-shadow: inset 3px 0 0 var(--green-500); }
+  .rij__naam { font-weight: 600; font-size: var(--text-base); }
+  .rij__meta { grid-column: 1 / -1; color: var(--ink-3); font-size: var(--text-xs); display: flex; gap: .5rem; flex-wrap: wrap; }
+  .chip {
+    font-size: var(--text-xs); padding: .1rem .45rem; border-radius: 999px;
+    border: 1px solid var(--line-strong); color: var(--ink-2); white-space: nowrap;
+  }
+  .chip[data-ov="loopafstand"] { border-color: var(--green-500); color: var(--green-400); }
+  .chip[data-ov="korte rit"] { border-color: var(--gold-500, var(--line-strong)); color: var(--ink-2); }
+  .chip[data-status="concept"] { border-color: var(--gold-500, var(--line-strong)); }
+  .chip[data-status="goedgekeurd"], .chip[data-status="verstuurd"], .chip[data-status="gesprek"] { border-color: var(--green-500); color: var(--green-400); }
+  .chip[data-status="afgewezen"] { color: var(--ink-4); }
+
+  .detail { border: 1px solid var(--line); border-radius: .625rem; background: var(--panel, var(--bg-deep)); padding: 1.125rem 1.25rem 1.25rem; }
+  .detail h2 { margin: 0 0 .25rem; font-family: var(--font-display); font-size: var(--text-lg); }
+  .detail__meta { color: var(--ink-3); font-size: var(--text-sm); display: flex; gap: .75rem; flex-wrap: wrap; margin-bottom: .75rem; }
+  .detail__meta a { color: var(--green-400); }
+
+  .mail { margin: 0; }
+  .mail__onderwerp { font-weight: 600; margin: .75rem 0 .375rem; }
+  .mail__body {
+    margin: 0; padding: .875rem 1rem; border-radius: .5rem; border: 1px solid var(--line);
+    background: var(--bg); white-space: pre-wrap; font-family: var(--font-ui);
+    font-size: var(--text-sm); line-height: 1.6; color: var(--ink-2);
+  }
+
+  .oordeel { margin: .75rem 0 0; font-size: var(--text-sm); }
+  .oordeel[data-goed="true"] { color: var(--green-400); }
+  .oordeel[data-goed="false"] { color: var(--clay-400); }
+  .oordeel ul { margin: .25rem 0 0; padding-left: 1.1rem; }
+
+  .acties { display: flex; gap: .5rem; flex-wrap: wrap; margin-top: 1rem; }
+  .leeg { color: var(--ink-3); font-size: var(--text-sm); margin: 0; }
+  .voortgang { font-size: var(--text-sm); color: var(--ink-2); font-family: var(--font-mono); }
+</style>
+</head>
+<body>
+
+<header class="topbar">
+  <div class="topbar__left">
+    <a class="btn btn--ghost" href="/dashboard">← Portfolio</a>
+    <div class="topbar__id">
+      <strong>Stage</strong>
+      <span id="profiel-regel" class="muted">laden…</span>
+    </div>
+  </div>
+  <div class="topbar__right">
+    <span class="quota" id="quota">—</span>
+    <button id="theme" class="btn btn--icon" type="button" title="Wissel licht/donker" aria-label="Wissel licht/donker thema">◐</button>
+  </div>
+</header>
+
+<main class="stage">
+
+  <section class="balk">
+    <div class="balk__groep seg" id="weergave" role="group" aria-label="Weergave">
+      <button class="seg__btn" data-view="vandaag" type="button">Vandaag</button>
+      <button class="seg__btn" data-view="beoordelen" type="button">Te beoordelen</button>
+      <button class="seg__btn" data-view="wachtrij" type="button">Wachtrij</button>
+      <button class="seg__btn" data-view="verstuurd" type="button">Verstuurd</button>
+    </div>
+    <div class="balk__groep">
+      <button id="dagrun" class="btn" type="button">Dagrun starten</button>
+      <button id="aanvoer-eigen" class="btn btn--ghost" type="button">Eigen lijst</button>
+      <button id="aanvoer-osm" class="btn btn--ghost" type="button">OpenStreetMap</button>
+      <form id="voeg" class="balk__groep" autocomplete="off">
+        <input id="voeg-url" class="input" type="text" placeholder="bedrijf.nl" aria-label="Website toevoegen">
+        <button class="btn btn--ghost" type="submit">Voeg toe</button>
+      </form>
+    </div>
+  </section>
+
+  <p class="melding" id="eisen" hidden></p>
+  <p class="melding" id="melding" hidden></p>
+  <p class="voortgang" id="voortgang" hidden></p>
+
+  <div class="raster">
+    <ul class="lijst" id="lijst" aria-label="Bedrijven"></ul>
+    <section class="detail" id="detail">
+      <p class="leeg">Kies links een bedrijf om de mail te lezen.</p>
+    </section>
+  </div>
+
+</main>
+
+<script src="/stage.js" type="module"></script>
+</body>
+</html>

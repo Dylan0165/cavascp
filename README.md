@@ -2,9 +2,10 @@
 
 Drie onderdelen, op één analyse-laag:
 
-- een **lokaal dashboard** — je portfolio en je documenten in de browser
+- een **lokaal dashboard** — je portfolio, je documenten en je stage-outreach in de browser
 - een **MCP-server** — vraag het vanuit de chat
 - een **Portflow-brug** — zet een document met één klik in je portfolio
+- een **stagebot** — bedrijven vinden, lezen en mailen voor je stage
 
 Canvas wordt volledig automatisch gelezen met een persoonlijk API-token.
 Portflow gaat via een echte browser, omdat daar geen publieke API voor is.
@@ -30,6 +31,10 @@ Wat je ziet:
   met niveaus, ingeleverd werk, en een notitieveld.
 - **Documenten**: sleep hier je bewijsstukken naartoe, kies een Portflow-collectie
   en druk op **Naar Portflow**. Het bestand staat dan in je portfolio.
+
+Daarnaast: **`/stage`** — het outreach-scherm. Wachtrij, daglimiet van twintig,
+de mail van elk bedrijf met de controle eronder, en de knop om de status te
+zetten. Zelfde server, zelfde sessie, zelfde poort. Zie `docs/stagebot.md`.
 
 Filters: periode (verlopen / 7 / 30 / 90 dagen / alles), status, cursus, en vrije
 zoektekst. `Esc` sluit het paneel, `/` springt naar het zoekveld, en rechtsboven
@@ -294,6 +299,10 @@ node test-dashboard.mjs  # echte kliks via Chrome DevTools Protocol
 node test-documents.mjs  # document-inbox: upload, metadata, veiligheid
 node test-full-chain.mjs # bestand -> dashboard -> Portflow -> opruimen
 node shot-drawer.mjs     # screenshot van het detailpaneel
+
+cd ../stagebot
+node test-stagebot.mjs   # tekst, e-mail, tech, mailopmaak (38 checks)
+node test-queue.mjs      # afstand, OV, wachtrij, daglimiet (23 checks)
 
 cd ../browser
 node smoke-browser.mjs   # browser, profiel en Canvas-bereik

@@ -11,10 +11,12 @@
  */
 
 import { scanBedrijf, scanVanTekst } from './lib/scan.mjs';
-import { voegToe, zoekBedrijf, leesBedrijven, telPerStatus, werkBij, STATUS } from './lib/bedrijven.mjs';
+import { voegToe, zoekBedrijf, leesBedrijven, telPerStatus, werkBij, STATUS, wachtrij, dagTelling, vandaag, DAG_LIMIET } from './lib/bedrijven.mjs';
 import { schrijfMail, keurMail } from './lib/mail.mjs';
 import { leesProfiel, bewaarProfiel, profielAlsTekst, verrijkVanuitCanvas } from './lib/profiel.mjs';
 import { aiBeschikbaar, vindSleutel } from './lib/deepseek.mjs';
+import { zoekBedrijven, voegKandidatenToe, seedKandidaten, voegUrlToe } from './lib/zoeken.mjs';
+import { leesEnSchrijf } from './lib/pijplijn.mjs';
 import { readFileSync } from 'node:fs';
 
 const [, , commando, ...rest] = process.argv;
@@ -26,6 +28,10 @@ function gebruik() {
   console.log(`
   De stagebot
 
+    node stagebot/cli.mjs zoek            bedrijven zoeken in de regio (OSM + je eigen lijst)
+    node stagebot/cli.mjs dag             twintig kandidaten lezen en mail schrijven
+    node stagebot/cli.mjs status          wat staat er in de wachtrij, en hoe ver is vandaag
+    node stagebot/cli.mjs voeg <url>      zelf een bedrijf toevoegen
     node stagebot/cli.mjs scan <url>      een bedrijf lezen en bewaren
     node stagebot/cli.mjs scan <url> --tekst <bestand>
                                           zelf geplakte tekst inlezen, voor sites
@@ -45,6 +51,119 @@ function gebruik() {
 
 async function main() {
   switch (commando) {
+    case 'zoek': {
+      /*
+       * Twee bronnen, in deze volgorde:
+       *
+       *   1. je eigen lijst (data/stagebot/seed-bedrijven.json) — werkt altijd
+       *   2. OpenStreetMap — automatisch, maar de publieke API is vaak vol
+       *
+       * De tweede mag falen zonder de eerste ongedaan te maken: je wilt niet
+       * met lege handen staan omdat een publieke dienst overbelast is.
+       */
+      const seed = seedKandidaten();
+      const seedUitkomst = voegKandidatenToe(seed);
+      console.log(`\n  eigen lijst: ${seed.length} bedrijven, ${seedUitkomst.nieuw.length} nieuw`);
+
+      console.log('  OpenStreetMap bevragen (kan een minuut duren)…');
+      let osm = [];
+      try {
+        osm = await zoekBedrijven();
+        const { nieuw } = voegKandidatenToe(osm);
+        console.log(`  OpenStreetMap: ${osm.length} kandidaten, ${nieuw.length} nieuw`);
+      } catch (fout) {
+        console.log(`  OpenStreetMap overgeslagen: ${fout.message}`);
+      }
+
+      const wacht = wachtrij({ limiet: 200 });
+      console.log(`\n  ${wacht.length} bedrijven in de wachtrij:`);
+      for (const b of wacht.slice(0, 25)) {
+        const plek = [b.plaats, b.ov].filter(Boolean).join(' · ');
+        console.log(`     ${String(b.id).padEnd(22)} ${String(b.titel).slice(0, 30).padEnd(30)} ${plek}`);
+      }
+      if (wacht.length > 25) console.log(`     … en ${wacht.length - 25} meer`);
+      console.log('\n  Nu: node stagebot/cli.mjs dag\n');
+      return 0;
+    }
+
+    case 'status': {
+      const telling = dagTelling();
+      const perStatus = telPerStatus();
+      console.log(`\n  Vandaag (${telling.dag}): ${telling.gedaan}/${telling.limiet} gedaan, ${telling.over} te gaan`);
+      console.log(`  ${lijn()}`);
+      for (const [status, aantal] of Object.entries(perStatus.perStatus)) {
+        console.log(`  ${String(aantal).padStart(3)}  ${STATUS[status] ?? status}`);
+      }
+      console.log(`  ${lijn()}`);
+      console.log(`  wachtrij: ${wachtrij({ limiet: 500 }).length} bedrijven om te lezen`);
+      console.log('');
+      return 0;
+    }
+
+    case 'voeg': {
+      const url = rest[0];
+      if (!url) {
+        console.log('  welke site? bijvoorbeeld: node stagebot/cli.mjs voeg daemen-ict.nl');
+        return 1;
+      }
+      const bedrijf = voegUrlToe(url);
+      console.log(`\n  toegevoegd: ${bedrijf.titel} (${bedrijf.domein})\n`);
+      return 0;
+    }
+
+    case 'dag': {
+      const limietIndex = rest.indexOf('--limiet');
+      const limiet = limietIndex !== -1 ? Number(rest[limietIndex + 1]) || DAG_LIMIET : DAG_LIMIET;
+
+      const telling = dagTelling();
+      const teDoen = Math.min(limiet, telling.over);
+      if (teDoen <= 0) {
+        console.log(`\n  Vandaag staan er al ${telling.gedaan} klaar (limiet ${telling.limiet}).`);
+        console.log('  Morgen weer. Zo blijft het tempo waar je adres tegen kan.\n');
+        return 0;
+      }
+
+      console.log(`\n  ${telling.dag}: ${telling.gedaan} gedaan, ${teDoen} te gaan`);
+
+      // Zonder aanvoer valt er niets te lezen. Eerst je eigen lijst, dan OSM.
+      if (wachtrij({ limiet: 1 }).length === 0) {
+        console.log('  geen wachtrij — eerst je eigen lijst en OpenStreetMap…');
+        voegKandidatenToe(seedKandidaten());
+        try {
+          voegKandidatenToe(await zoekBedrijven());
+        } catch (fout) {
+          console.log(`  OpenStreetMap overgeslagen: ${fout.message}`);
+        }
+      }
+
+      const kandidaten = wachtrij({ limiet: teDoen });
+      if (!kandidaten.length) {
+        console.log('\n  Geen kandidaten. Voeg er een toe met: node stagebot/cli.mjs voeg <url>\n');
+        return 1;
+      }
+
+      let gelukt = 0;
+      const mislukt = [];
+      for (const kandidaat of kandidaten) {
+        console.log(`\n  ${kandidaat.titel} (${kandidaat.domein})`);
+        try {
+          const { keuring } = await leesEnSchrijf(kandidaat.id);
+          gelukt += 1;
+          const oordeel = keuring.goed ? 'in orde' : `let op: ${keuring.punten.join('; ')}`;
+          console.log(`     mail geschreven — ${keuring.woorden} woorden, ${oordeel}`);
+        } catch (fout) {
+          mislukt.push({ bedrijf: kandidaat.titel, fout: fout.message });
+          console.log(`     overgeslagen: ${fout.message}`);
+        }
+      }
+
+      console.log(`\n  ${lijn()}`);
+      console.log(`  ${gelukt} klaargezet, ${mislukt.length} mislukt`);
+      for (const m of mislukt) console.log(`     ${m.bedrijf}: ${m.fout}`);
+      console.log(`  Nog ${dagTelling().over} van vandaag over. Open het dashboard om na te kijken.\n`);
+      return gelukt ? 0 : 1;
+    }
+
     case 'scan': {
       const url = rest[0];
       if (!url) {

@@ -37,8 +37,16 @@ export function inProject(...delen) {
 /** Het .env-bestand. */
 export const ENV_PAD = process.env.CANVAS_ENV_FILE || inProject('.env');
 
-/** De datamap. */
-export const DATA_MAP = inProject('data');
+/**
+ * De datamap.
+ *
+ * CAVASCP_DATA_DIR laat tests (en een tweede kopie naast je echte dossier)
+ * werken in een tijdelijke map. Zonder die variabele staat alles gewoon in
+ * <project>/data.
+ */
+export const DATA_MAP = process.env.CAVASCP_DATA_DIR
+  ? path.resolve(process.env.CAVASCP_DATA_DIR)
+  : inProject('data');
 
 /** Een pad binnen data/. */
 export function inData(...delen) {

@@ -225,7 +225,7 @@ export function keurMail(mail, profiel = leesProfiel()) {
    * gemeld — een controle die een goede mail afkeurt, leer je negeren.
    */
   const optOut =
-    /(nee is (ook )?(goed|prima|best|fijn)|geen interesse|niet ge[ïi]nteresseerd|laat het (vooral |gerust |even )?weten|dan hoor ik het graag|als (dit|deze|jullie) (niets|geen)|hoeft u (niet|geen)|dank is ook goed)/i;
+    /(nee is [^.;\n]{0,20}(goed|prima|best|fijn)|geen interesse|niet ge[ïi]nteresseerd|laat het (vooral |gerust |even )?weten|dan hoor ik het graag|als (dit|deze|jullie) (niets|geen)|hoeft u (niet|geen)|dank is ook goed)/i;
   if (!optOut.test(`${body}\n${mail.volledig}`)) {
     punten.push('geen regel waarin ze kunnen afwijzen — dat is verplicht bij zakelijke e-mail');
   }

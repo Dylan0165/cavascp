@@ -30,22 +30,49 @@ const EXTRA_PADEN = [
   '/careers',
 ];
 
-/** Haalt HTML op. Geeft null als het niet lukt. */
-async function haalHtml(url) {
-  try {
-    const antwoord = await fetch(url, {
-      headers: { 'User-Agent': USER_AGENT, Accept: 'text/html,application/xhtml+xml' },
-      redirect: 'follow',
-      signal: AbortSignal.timeout(20_000),
-    });
-    if (!antwoord.ok) return null;
-    const type = antwoord.headers.get('content-type') || '';
-    if (!type.includes('html')) return null;
-    const html = await antwoord.text();
-    return { html, url: antwoord.url || url };
-  } catch {
-    return null;
+/**
+ * Haalt HTML op.
+ *
+ * Geeft `{ html, url }` bij succes en `{ fout }` bij een mislukking. De reden
+ * moet mee: bij twintig bedrijven per dag is "kon de site niet lezen" een
+ * onbruikbare melding — je wilt weten of het een time-out was, een 403 van een
+ * firewall, of een verkeerd adres.
+ *
+ * Eén herhaling, want een enkele time-out zegt niets over de site.
+ */
+async function haalHtml(url, { pogingen = 2 } = {}) {
+  let laatste = 'onbekende fout';
+
+  for (let poging = 1; poging <= pogingen; poging += 1) {
+    try {
+      const antwoord = await fetch(url, {
+        headers: { 'User-Agent': USER_AGENT, Accept: 'text/html,application/xhtml+xml' },
+        redirect: 'follow',
+        signal: AbortSignal.timeout(20_000),
+      });
+
+      if (!antwoord.ok) {
+        laatste = `HTTP ${antwoord.status}`;
+        continue;
+      }
+
+      const type = antwoord.headers.get('content-type') || '';
+      if (!type.includes('html')) {
+        laatste = `geen HTML maar ${type.split(';')[0] || 'onbekend type'}`;
+        continue;
+      }
+
+      const html = await antwoord.text();
+      return { html, url: antwoord.url || url };
+    } catch (fout) {
+      laatste =
+        fout.name === 'TimeoutError'
+          ? 'geen antwoord binnen 20 seconden'
+          : (fout.cause?.code ?? fout.message);
+    }
   }
+
+  return { fout: laatste };
 }
 
 /** Maakt leesbare tekst van HTML. */
@@ -274,8 +301,10 @@ export function domeinVan(url) {
  */export async function scanBedrijf(invoer) {
   const basis = normaliseerUrl(invoer);
   const eerste = await haalHtml(basis);
-  if (!eerste) {
-    throw new Error(`Kon ${basis} niet lezen. Bestaat de site, en blokkeert hij geen bots?`);
+  if (!eerste.html) {
+    throw new Error(
+      `Kon ${basis} niet lezen (${eerste.fout}). Bestaat de site, en blokkeert hij geen bots?`,
+    );
   }
 
   const eersteTekst = tekstVanHtml(eerste.html);
@@ -304,7 +333,7 @@ export function domeinVan(url) {
   for (const pad of EXTRA_PADEN) {
     const url = basis + pad;
     const pagina = await haalHtml(url);
-    if (!pagina) continue;
+    if (!pagina.html) continue;
     const tekst = tekstVanHtml(pagina.html);
     if (tekst.length < 80) continue;
     // Niet twee keer dezelfde inhoud.
