@@ -88,7 +88,12 @@ export function bewaarProfiel(profiel) {
 export async function verrijkVanuitCanvas(canvas, { term } = {}) {
   const profiel = leesProfiel();
 
-  const cursussen = await canvas.get('/courses', {
+  /*
+   * Let op het pad. De Canvas-client plakt base + pad aan elkaar, en de base is
+   * alleen het domein. Zonder `/api/v1` vraag je de webpagina op in plaats van
+   * de API, en dan krijg je een 401 die eruitziet als een ongeldig token.
+   */
+  const cursussen = await canvas.get('/api/v1/courses', {
     enrollment_state: 'active',
     per_page: 50,
     'include[]': ['term'],
