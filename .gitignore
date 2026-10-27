@@ -62,3 +62,6 @@ data/documenten/
 # De stagebot houdt bij welke bedrijven je hebt benaderd en wat ze antwoordden.
 # Dat is een zakelijk dossier, geen openbaar bestand.
 data/stagebot/
+
+# Tijdelijk bestand voor een commit-boodschap.
+.git-commit-msg.txt
