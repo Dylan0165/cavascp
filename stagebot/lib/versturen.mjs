@@ -16,7 +16,7 @@
 import { zoekBedrijf, werkBij, leesBedrijven } from './bedrijven.mjs';
 import { leesProfiel } from './profiel.mjs';
 import { verstuurMail, gmailBeschikbaar } from './gmail.mjs';
-import { meldTeams, maakTeamsBericht } from './teams.mjs';
+import { meldKanaal, maakTeamsBericht } from './teams.mjs';
 
 /** Adressen die je nooit wilt gebruiken. */
 const ONGELDIG = /^(noreply|no-reply|postmaster|abuse|webmaster)@/i;
@@ -85,7 +85,7 @@ export async function verstuurBedrijf(id, { droog = false, stil = false } = {}) 
    * steeds verstuurd en mag er niets stukgaan.
    */
   if (!droog && !stil) {
-    await meldTeams(
+    await meldKanaal(
       maakTeamsBericht({
         titel: `Mail verstuurd: ${bedrijf.titel}`,
         tekst: bedrijf.mail.onderwerp,
@@ -124,7 +124,7 @@ export async function verstuurGoedgekeurd({ limiet = 20, droog = false } = {}) {
 
   // Eén samenvatting in plaats van twintig losse meldingen.
   if (klaar.length && !droog) {
-    await meldTeams(
+    await meldKanaal(
       maakTeamsBericht({
         titel: `${klaar.length} mail${klaar.length === 1 ? '' : 's'} verstuurd`,
         tekst: mislukt.length ? `${mislukt.length} mislukt — zie het scherm.` : 'Alles is de deur uit.',

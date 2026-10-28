@@ -231,6 +231,14 @@ export async function verstuurTeams(kaart, { url, timeoutMs = TIMEOUT_MS } = {})
   }
 }
 
+/** De kaart als platte tekst, voor als de melding via de mail gaat. */
+export function platteTekst(kaart) {
+  const regels = [kaart?.Message ?? ''];
+  const feiten = kaart?.attachments?.[0]?.content?.body?.find((blok) => blok.type === 'FactSet');
+  for (const feit of feiten?.facts ?? []) regels.push(`${feit.title}: ${feit.value}`);
+  return regels.filter(Boolean).join('\n');
+}
+
 /**
  * Een melding, maar nooit zo belangrijk dat hij iets anders mag breken.
  *
@@ -246,5 +254,41 @@ export async function meldTeams(kaart) {
   } catch (fout) {
     console.warn(`  Teams-melding mislukte: ${fout.message}`);
     return { ok: false, reden: fout.message };
+  }
+}
+
+
+/**
+ * Een melding via het kanaal dat wél werkt.
+ *
+ * Teams eerst. Is dat niet gekoppeld, dan gaat dezelfde melding als mail naar
+ * jezelf — je hebt Gmail immers al gekoppeld. Zo krijg je vanaf de eerste
+ * verstuurde mail bericht, ook voordat de Teams-flow er is.
+ */
+export async function meldKanaal(kaart) {
+  if (teamsBeschikbaar()) {
+    const uitkomst = await meldTeams(kaart);
+    if (uitkomst.ok) return { kanaal: 'teams', ok: true };
+  }
+
+  try {
+    const { gmailBeschikbaar, verstuurMail } = await import('./gmail.mjs');
+    if (!gmailBeschikbaar()) return { kanaal: 'geen', ok: false };
+
+    const { leesProfiel } = await import('./profiel.mjs');
+    const profiel = leesProfiel();
+    if (!profiel.email) return { kanaal: 'geen', ok: false };
+
+    await verstuurMail({
+      van: profiel.email,
+      vanNaam: 'Stagebot',
+      aan: profiel.email,
+      onderwerp: kaart?.Title ?? 'Stagebot',
+      tekst: platteTekst(kaart),
+    });
+    return { kanaal: 'mail', ok: true };
+  } catch (fout) {
+    console.warn(`  Melding mislukte ook via de mail: ${fout.message}`);
+    return { kanaal: 'mail', ok: false };
   }
 }

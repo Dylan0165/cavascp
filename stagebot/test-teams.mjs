@@ -19,7 +19,7 @@ import path from 'node:path';
 process.env.CAVASCP_DATA_DIR = mkdtempSync(path.join(tmpdir(), 'stagebot-teams-'));
 process.env.TEAMS_EXTRA_HOSTS = '127.0.0.1';
 
-const { isTeamsUrl, maakTeamsBericht, verstuurTeams, bewaarTeamsWebhook, verwijderTeamsWebhook, vindTeamsWebhook } =
+const { isTeamsUrl, maakTeamsBericht, platteTekst, verstuurTeams, bewaarTeamsWebhook, verwijderTeamsWebhook, vindTeamsWebhook } =
   await import('./lib/teams.mjs');
 
 let gelukt = 0;
@@ -145,7 +145,20 @@ check('een 500 geeft een echte fout', () => {
 
 antwoordCode = 202;
 
-console.log('\n5) De koppeling bewaren');
+console.log('\n5) De melding als mail (als Teams niet gekoppeld is)');
+
+check('de kaart wordt leesbare tekst', () => {
+  const tekst = platteTekst(kaart);
+  assert.match(tekst, /Stage infrastructuur en security/);
+  assert.match(tekst, /Naar: info@daemen\.nl/);
+});
+
+check('zonder tekst blijft er geen lege regel over', () => {
+  const tekst = platteTekst(maakTeamsBericht({ titel: 'Klaar' }));
+  assert.equal(tekst, '');
+});
+
+console.log('\n6) De koppeling bewaren');
 
 check('een verkeerde URL wordt geweigerd', () => {
   assert.throws(() => bewaarTeamsWebhook('https://example.com/x'), /geen Teams-webhook-URL/i);
