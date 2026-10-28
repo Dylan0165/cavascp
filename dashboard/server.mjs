@@ -48,6 +48,7 @@ import {
 import { zoekBedrijven, voegKandidatenToe, seedKandidaten, voegUrlToe } from '../stagebot/lib/zoeken.mjs';
 import { leesEnSchrijf } from '../stagebot/lib/pijplijn.mjs';
 import { keurMail } from '../stagebot/lib/mail.mjs';
+import { haalAntwoorden } from '../stagebot/lib/inbox.mjs';
 import { verstuurBedrijf, verstuurGoedgekeurd, kiesAdres } from '../stagebot/lib/versturen.mjs';
 import { gmailBeschikbaar, vindGmailSleutels, bewaarGmailSleutels, verwijderGmailSleutels, controleerGmailLogin } from '../stagebot/lib/gmail.mjs';
 import { leesProfiel } from '../stagebot/lib/profiel.mjs';
@@ -1345,6 +1346,8 @@ const server = createServer(async (req, res) => {
         paginas: bedrijf.paginas ?? [],
         mail: bedrijf.mail ?? null,
         notities: bedrijf.notities ?? [],
+        antwoorden: bedrijf.antwoorden ?? [],
+        laatsteAntwoord: bedrijf.laatsteAntwoord ?? null,
       });
     }
 
@@ -1435,6 +1438,26 @@ const server = createServer(async (req, res) => {
           mislukt,
           overzicht: stageOverzicht(),
         });
+      } catch (fout) {
+        return sendJson(res, 502, { error: fout.message, overzicht: stageOverzicht() });
+      }
+    }
+
+    /*
+     * Antwoorden lezen uit Gmail. Duurt een paar seconden (IMAP), dus achter
+     * een eigen rem. Alleen-lezen: er wordt niets in je mailbox veranderd.
+     */
+    if (pathname === '/api/stage/inbox' && req.method === 'POST') {
+      if (!security.rateLimitOk({ emmer: 'mail', limiet: 20 })) {
+        return sendJson(res, 429, { error: 'Te veel pogingen. Even wachten.' });
+      }
+      const body = await readBody(req).catch(() => ({}));
+      try {
+        const { gelezen, nieuw } = await haalAntwoorden({
+          dagen: Number(body.dagen ?? 30),
+          limiet: Number(body.limiet ?? 40),
+        });
+        return sendJson(res, 200, { gelezen, nieuw, overzicht: stageOverzicht() });
       } catch (fout) {
         return sendJson(res, 502, { error: fout.message, overzicht: stageOverzicht() });
       }

@@ -81,6 +81,13 @@
   .acties { display: flex; gap: .5rem; flex-wrap: wrap; margin-top: 1rem; }
   .leeg { color: var(--ink-3); font-size: var(--text-sm); margin: 0; }
 
+  .antwoorden { margin: 1rem 0 0; border-top: 1px solid var(--line); padding-top: .75rem; }
+  .antwoorden__kop { margin: 0 0 .5rem; font-size: var(--text-xs); text-transform: uppercase; letter-spacing: .04em; color: var(--ink-3); }
+  .antwoord { padding: .5rem .625rem; border: 1px solid var(--line); border-radius: .5rem; margin-bottom: .375rem; background: var(--bg); }
+  .antwoord__titel { margin: 0; font-weight: 600; font-size: var(--text-sm); }
+  .antwoord__meta { margin: .125rem 0 0; color: var(--ink-3); font-size: var(--text-xs); }
+  .antwoord__tekst { margin: .375rem 0 0; color: var(--ink-2); font-size: var(--text-sm); line-height: 1.5; }
+
   .quota--knop {
     background: none; border: 0; padding: .25rem .375rem; border-radius: .375rem;
     cursor: pointer; font: inherit;
@@ -140,6 +147,7 @@
     <div class="balk__groep">
       <button id="dagrun" class="btn" type="button">Dagrun starten</button>
       <button id="verstuur-alles" class="btn btn--ghost" type="button" hidden>Verstuur goedgekeurd</button>
+      <button id="lees-inbox" class="btn btn--ghost" type="button" title="Antwoorden uit je Gmail lezen">Lees antwoorden</button>
       <button id="aanvoer-eigen" class="btn btn--ghost" type="button">Eigen lijst</button>
       <button id="aanvoer-osm" class="btn btn--ghost" type="button">OpenStreetMap</button>
       <form id="voeg" class="balk__groep" autocomplete="off">

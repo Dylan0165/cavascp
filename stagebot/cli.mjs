@@ -23,6 +23,7 @@ import { verstuurBedrijf, verstuurGoedgekeurd, kiesAdres } from './lib/versturen
 import { vindGmailSleutels } from './lib/gmail.mjs';
 import { vindTeamsWebhook, bewaarTeamsWebhook, verstuurTeams, maakTeamsBericht } from './lib/teams.mjs';
 import { vindTopic, bewaarTopic, nieuwTopic, verstuurPush } from './lib/ntfy.mjs';
+import { haalAntwoorden } from './lib/inbox.mjs';
 import { readFileSync } from 'node:fs';
 
 const [, , commando, ...rest] = process.argv;
@@ -41,6 +42,7 @@ function gebruik() {
     node stagebot/cli.mjs ov --alles      reistijd voor alle bedrijven opnieuw
     node stagebot/cli.mjs gmail           is Gmail gekoppeld? (--test stuurt een proefmail)
     node stagebot/cli.mjs teams           is Teams gekoppeld? (--test, --zet <url>)
+    node stagebot/cli.mjs inbox           antwoorden lezen uit je Gmail
     node stagebot/cli.mjs push            pushmeldingen naar je telefoon (ntfy)
     node stagebot/cli.mjs verstuur <id>   de mail van dat bedrijf echt versturen
     node stagebot/cli.mjs verstuur --alles alles wat goedgekeurd is
@@ -242,6 +244,24 @@ async function main() {
         `\n  ${bedrijf.titel}: ${reistijd.van} → ${reistijd.naar} — ${reistijd.minuten} min, ` +
           `${reistijd.overstappen} overstap${reistijd.overstappen === 1 ? '' : 'pen'}\n`,
       );
+      return 0;
+    }
+
+    case 'inbox': {
+      const dagenIndex = rest.indexOf('--dagen');
+      const dagen = dagenIndex !== -1 ? Number(rest[dagenIndex + 1]) || 30 : 30;
+
+      console.log(`\n  Gmail lezen (${dagen} dagen terug)…`);
+      const { gelezen, nieuw } = await haalAntwoorden({ dagen, melden: !rest.includes('--stil') });
+
+      console.log(`  ${gelezen} berichten bekeken, ${nieuw.length} nieuw van een bedrijf uit je lijst`);
+      for (const antwoord of nieuw) {
+        console.log(`\n  ${antwoord.bedrijf} — ${antwoord.onderwerp}`);
+        console.log(`     ${antwoord.soort} · van ${antwoord.van}`);
+        if (antwoord.samenvatting) console.log(`     ${antwoord.samenvatting.slice(0, 160)}`);
+      }
+      if (!nieuw.length) console.log('  Niets nieuws.');
+      console.log('');
       return 0;
     }
 

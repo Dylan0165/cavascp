@@ -5,7 +5,7 @@ Drie onderdelen, op één analyse-laag:
 - een **lokaal dashboard** — je portfolio, je documenten en je stage-outreach in de browser
 - een **MCP-server** — vraag het vanuit de chat
 - een **Portflow-brug** — zet een document met één klik in je portfolio
-- een **stagebot** — bedrijven vinden, lezen, mailen en versturen voor je stage, met een melding in Teams als het verstuurd is
+- een **stagebot** — bedrijven vinden, lezen, mailen, versturen en de antwoorden lezen, met een melding als er iets binnenkomt
 
 Canvas wordt volledig automatisch gelezen met een persoonlijk API-token.
 Portflow gaat via een echte browser, omdat daar geen publieke API voor is.
@@ -336,7 +336,8 @@ node test-ov.mjs         # planner op een nagemaakte dienstregeling (24 checks)
 
 cd ../stagebot
 node test-stagebot.mjs   # tekst, e-mail, tech, mailopmaak (38 checks)
-node test-teams.mjs      # URL-controle en de kaart, tegen een nepserver (18 checks)
+node test-teams.mjs      # URL-controle en de kaart, tegen een nepserver (20 checks)
+node test-inbox.mjs      # antwoorden herkennen en koppelen (17 checks)
 node test-queue.mjs      # afstand, OV, wachtrij, daglimiet (23 checks)
 node test-smtp.mjs       # het mailgesprek, tegen een nepserver (11 checks)
 

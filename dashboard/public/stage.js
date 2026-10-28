@@ -322,6 +322,42 @@ function renderDetail() {
     }
     host.append(oordeel);
 
+    if (b.antwoorden?.length) {
+      const blok = document.createElement('div');
+      blok.className = 'antwoorden';
+      const kop = document.createElement('p');
+      kop.className = 'antwoorden__kop';
+      kop.textContent = b.antwoorden.length === 1 ? 'Eén antwoord' : `${b.antwoorden.length} antwoorden`;
+      blok.append(kop);
+
+      for (const antwoord of [...b.antwoorden].reverse()) {
+        const regel = document.createElement('div');
+        regel.className = 'antwoord';
+
+        const titel = document.createElement('p');
+        titel.className = 'antwoord__titel';
+        titel.textContent = antwoord.onderwerp || '(geen onderwerp)';
+        regel.append(titel);
+
+        const meta = document.createElement('p');
+        meta.className = 'antwoord__meta';
+        const wanneer = antwoord.datum ? new Date(antwoord.datum).toLocaleString('nl-NL') : '';
+        meta.textContent = [antwoord.van, wanneer, antwoord.soort].filter(Boolean).join(' · ');
+        regel.append(meta);
+
+        if (antwoord.samenvatting) {
+          const tekst = document.createElement('p');
+          tekst.className = 'antwoord__tekst';
+          tekst.textContent = antwoord.samenvatting;
+          regel.append(tekst);
+        }
+
+        blok.append(regel);
+      }
+
+      host.append(blok);
+    }
+
     if (b.verzending) {
       const verzonden = document.createElement('p');
       verzonden.className = 'leeg';
@@ -558,6 +594,27 @@ async function verstuur(b) {
   }
 }
 
+async function leesInbox() {
+  if (state.bezig) return;
+  state.bezig = true;
+  voortgang('Gmail lezen…');
+  try {
+    const { gelezen, nieuw, overzicht } = await api('/api/stage/inbox', { body: { dagen: 30 } });
+    state.overzicht = overzicht;
+    renderAlles();
+    melding(
+      nieuw.length
+        ? `${nieuw.length} nieuw antwoord${nieuw.length === 1 ? '' : 'en'} van ${nieuw.map((n) => n.bedrijf).join(', ')}.`
+        : `${gelezen} berichten bekeken, niets nieuws.`,
+    );
+  } catch (fout) {
+    melding(fout.message, 'fout');
+  } finally {
+    state.bezig = false;
+    voortgang('');
+  }
+}
+
 async function verstuurAlles() {
   if (state.bezig) return;
   const klaar = state.overzicht?.teVersturen ?? [];
@@ -717,6 +774,7 @@ function start() {
 
   $('#dagrun').addEventListener('click', dagrun);
   $('#verstuur-alles').addEventListener('click', verstuurAlles);
+  $('#lees-inbox').addEventListener('click', leesInbox);
   $('#gmail').addEventListener('click', openGmail);
   $('#teams').addEventListener('click', openTeams);
   $('#teams-vorm').addEventListener('submit', koppelTeams);

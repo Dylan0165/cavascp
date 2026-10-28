@@ -130,6 +130,34 @@ het bovenaan, en daarom belooft geen enkele mail een aantal dagen: je kunt een
 bedrijf niet drie dagen aanbieden en er later achter komen dat het niet mag.
 Regel het met je stagecoördinator vóór je verstuurt.
 
+## Antwoorden lezen
+
+De bot leest je Gmail-inbox en koppelt wat er terugkomt aan het juiste bedrijf.
+
+```bash
+node stagebot/cli.mjs inbox --dagen 30
+```
+
+Of: de knop **Lees antwoorden** in het stage-scherm.
+
+Wat er gebeurt:
+
+1. De INBOX wordt gelezen via IMAP, met hetzelfde app-wachtwoord als het
+   versturen. Berichten blijven **ongelezen** (BODY.PEEK) — jij moet ze nog
+   zelf in je mail zien.
+2. Een bericht wordt gekoppeld aan een bedrijf op het afzenderadres of het
+   domein.
+3. Het bericht wordt ingedeeld: **afwijzing**, **automatisch antwoord**,
+   **stage** (uitnodiging, vraag) of gewoon **antwoord**.
+4. Bij een afwijzing gaat de status naar `afgewezen`, anders naar `geantwoord`.
+   Een bedrijf dat al op `gesprek` of `klaar` staat blijft daar.
+5. Je krijgt één melding als er iets nieuws is.
+
+Wat er **niet** in je dossier komt: je hele inbox. Alleen afzender, onderwerp
+en de eerste regels van berichten van bedrijven die je zelf hebt aangeschreven.
+Ruis (nieuwsbrieven, welkomstmails, tickets) wordt overgeslagen, en een bericht
+dat vóór je eigen mail binnenkwam telt niet als antwoord.
+
 ## Gmail koppelen
 
 De stagebot verstuurt via de SMTP-server van Gmail, met een **app-wachtwoord**.
