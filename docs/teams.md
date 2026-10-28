@@ -51,6 +51,34 @@ Bedrijf: Daemen ICT
 Bij een bulk-verzending komt er één samenvatting in plaats van twintig losse
 berichten.
 
+## Als de organisatie het blokkeert
+
+Bij Fontys werkt dit **niet**. De flow wordt wel aangemaakt, maar kan niet
+worden aangezet:
+
+> Your flow was saved, but could not be enabled because it conflicts with the
+> company data loss prevention policies.
+
+De oorzaak staat in de melding bij de flow zelf:
+
+> Admin data policy 'Omgeving Default environment' restricts use of these apis:
+> TeamsWebhookRequestReceived.
+
+Dat is een **DLP-beleid van de tenant**, niet iets wat de stagebot kan omzeilen.
+Dezelfde blokkade geldt voor de algemene HTTP-trigger in combinatie met de
+Teams-connector. En het lezen van documenten uit Teams (Microsoft Graph) vraagt
+bovendien toestemming van een beheerder — die route is om dezelfde reden dicht.
+
+Wat dan wél werkt:
+
+- **meldingen per mail** naar jezelf (de stagebot doet dat automatisch als
+  Teams niet gekoppeld is);
+- een andere pushdienst die niets met Microsoft te maken heeft, zoals ntfy.
+
+Wil je het toch via Teams, dan moet de Fontys-beheerder het beleid aanpassen.
+Vraag dan om `TeamsWebhookRequestReceived` toe te staan in het standaard
+Power Platform-beleid. Dat is een vraag aan ICT, niet iets voor een script.
+
 ## Instellen zonder scherm
 
 ```bash
