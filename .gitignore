@@ -62,6 +62,10 @@ data/leeruitkomsten.json
 data/lo-koppeling.json
 data/documenten/
 
+# De dienstregeling: 200 MB zip en een afgeleid bestand van een paar MB.
+# Allebei te maken met `node ov/import.mjs`; niet iets voor versiebeheer.
+data/ov/
+
 # De stagebot houdt bij welke bedrijven je hebt benaderd en wat ze antwoordden.
 # Dat is een zakelijk dossier, geen openbaar bestand.
 data/stagebot/

@@ -126,20 +126,19 @@ zonder herstart bij. Gebeurt dat niet, herstart DSH dan.
 | `assignment_detail` | Volledige details van één opdracht |
 | `canvas_whoami` | Gezondheidscheck van de koppeling |
 
-Daarnaast een tweede MCP-server voor het OV — `mcp-ns` in hetzelfde
-profielbestand:
+Daarnaast een tweede MCP-server voor het OV — `mcp-ov` in hetzelfde
+profielbestand. Die rekent met een eigen kopie van de dienstregeling (open
+data), dus zonder sleutel:
 
 | Tool | Waarvoor |
 |---|---|
-| `ns_reisadvies` | van station naar station, met tijden en overstappen |
-| `ns_reistijd` | de snelste reistijd in één regel |
-| `ns_storingen` | wat er mis is, eventueel rond een station |
-| `ns_vertrektijden` | de volgende treinen vanaf een station |
-| `ns_stations` | stations zoeken |
-| `ns_status` | werkt de NS-koppeling? |
+| `ov_reisadvies` | van station naar station, met tijden en overstappen |
+| `ov_reistijd` | de snelste reistijd in één regel |
+| `ov_stations` | stations zoeken |
+| `ov_status` | is de dienstregeling ingelezen? |
 
-Zie `docs/ov.md`. Zonder NS-sleutel werkt de rest gewoon; alleen de reistijden
-blijven dan leeg.
+Zie `docs/ov.md`. Eerst eenmalig `node ov/import.mjs` (± 200 MB, 40 seconden);
+daarna werkt het uit `data/ov/net.json` van een paar MB.
 
 ## Beveiliging
 
@@ -332,8 +331,8 @@ node test-documents.mjs  # document-inbox: upload, metadata, veiligheid
 node test-full-chain.mjs # bestand -> dashboard -> Portflow -> opruimen
 node shot-drawer.mjs     # screenshot van het detailpaneel
 
-cd ../mcp/ns
-node test-ns.mjs         # NS-client tegen een nepserver (19 checks)
+cd ../ov
+node test-ov.mjs         # planner op een nagemaakte dienstregeling (24 checks)
 
 cd ../stagebot
 node test-stagebot.mjs   # tekst, e-mail, tech, mailopmaak (38 checks)

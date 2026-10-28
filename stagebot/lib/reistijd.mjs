@@ -20,14 +20,17 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { inData } from '../../mcp/lib/paden.mjs';
-import { reisadvies, snelsteReis, nsBeschikbaar } from '../../mcp/ns/lib/client.mjs';
+import { laadNet, plan, isGeimporteerd } from '../../ov/lib/planner.mjs';
 import { leesProfiel } from './profiel.mjs';
 import { werkBij } from './bedrijven.mjs';
 
 const CACHE_PAD = inData('stagebot', 'cache', 'reistijden.json');
 
-/** Een week: dienstregelingen veranderen zelden, werkzaamheden wel. */
+/** Een week: dienstregelingen veranderen twee keer per jaar. */
 const CACHE_MS = 7 * 24 * 60 * 60 * 1000;
+
+/** De tijd waarop je zou vertrekken als je er moet werken. */
+const VERTREKTIJD = '08:30';
 
 function leesCache() {
   if (!existsSync(CACHE_PAD)) return {};
@@ -44,20 +47,13 @@ function bewaarCache(cache) {
 }
 
 /**
- * De volgende werkdag om 08:30.
+ * Wanneer rekenen we?
  *
- * Vrijdagavond → maandag. Zo krijg je nooit een zondagsdienstregeling als
- * representatieve reistijd.
+ * De volgende werkdag om 08:30 — de reis die je maakt als je er werkt. De
+ * planner kiest die dag zelf; hier staat alleen de tijd.
  */
-export function representatiefMoment(nu = new Date()) {
-  const datum = new Date(nu);
-  datum.setHours(8, 30, 0, 0);
-  if (datum.getTime() <= nu.getTime()) datum.setDate(datum.getDate() + 1);
-
-  while (datum.getDay() === 0 || datum.getDay() === 6) {
-    datum.setDate(datum.getDate() + 1);
-  }
-  return datum;
+export function representatiefMoment() {
+  return VERTREKTIJD;
 }
 
 /**
@@ -67,7 +63,7 @@ export function representatiefMoment(nu = new Date()) {
  */
 export async function berekenReistijd(bedrijf, { force = false } = {}) {
   if (!bedrijf?.station?.naam) return null;
-  if (!nsBeschikbaar()) return null;
+  if (!isGeimporteerd()) return null;
 
   const thuis = leesProfiel().stage?.ovVan || 'Roosendaal';
   const doel = bedrijf.station.naam;
@@ -80,20 +76,18 @@ export async function berekenReistijd(bedrijf, { force = false } = {}) {
   let reistijd = vers ? bewaard.waarde : null;
 
   if (!reistijd || force) {
-    const reizen = await reisadvies({
-      van: thuis,
-      naar: doel,
-      vertrek: representatiefMoment(),
-      aantal: 3,
-    });
-    const snel = snelsteReis(reizen);
-    if (!snel) return null;
+    const net = laadNet();
+    const reizen = plan(net, { van: thuis, naar: doel, vertrek: VERTREKTIJD, aantal: 2 });
+    if (!reizen.length) return null;
+    const snel = reizen[0];
 
     reistijd = {
       minuten: snel.minuten,
       overstappen: snel.overstappen,
       van: thuis,
       naar: doel,
+      vertrek: snel.vertrek,
+      aankomst: snel.aankomst,
       op: new Date().toISOString(),
     };
 

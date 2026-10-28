@@ -191,18 +191,24 @@ function renderLijst() {
       bedrijf.ov && bedrijf.ov !== 'onbekend'
         ? `${bedrijf.ov}${stationKm != null ? ` · ${stationKm} km` : ''}`
         : 'OV onbekend';
-    knop.append(chip(ovTekst, 'ov', bedrijf.ov ?? 'onbekend'));
+    // De chips bij elkaar in de tweede kolom; losse chips in een gridrek zou
+    // de treintijd over de hele breedte uitrekken.
+    const chips = document.createElement('span');
+    chips.className = 'rij__chips';
+    chips.append(chip(ovTekst, 'ov', bedrijf.ov ?? 'onbekend'));
 
-    // De treinreis, als de NS-koppeling er is. Zonder koppeling blijft hij weg
-    // in plaats van "onbekend" te zeggen: dat is een ander soort leegte.
+    // De treinreis, als de dienstregeling er is. Zonder dienstregeling blijft
+    // hij weg in plaats van "onbekend" te zeggen: dat is een ander soort leegte.
     if (bedrijf.reistijd?.minuten != null) {
-      const trein = chip(
-        `🚆 ${bedrijf.reistijd.minuten} min${bedrijf.reistijd.overstappen ? ` · ${bedrijf.reistijd.overstappen}× over` : ''}`,
-        'trein',
-        'ja',
+      chips.append(
+        chip(
+          `🚆 ${bedrijf.reistijd.minuten} min${bedrijf.reistijd.overstappen ? ` · ${bedrijf.reistijd.overstappen}× over` : ''}`,
+          'trein',
+          'ja',
+        ),
       );
-      knop.append(trein);
     }
+    knop.append(chips);
 
     const meta = document.createElement('span');
     meta.className = 'rij__meta';

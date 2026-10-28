@@ -51,6 +51,7 @@ import { keurMail } from '../stagebot/lib/mail.mjs';
 import { verstuurBedrijf, verstuurGoedgekeurd, kiesAdres } from '../stagebot/lib/versturen.mjs';
 import { gmailBeschikbaar, vindGmailSleutels, bewaarGmailSleutels, verwijderGmailSleutels, controleerGmailLogin } from '../stagebot/lib/gmail.mjs';
 import { leesProfiel } from '../stagebot/lib/profiel.mjs';
+import { laadNet, plan, zoekHaltes, isGeimporteerd } from '../ov/lib/planner.mjs';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const PUBLIC_DIR = path.join(HERE, 'public');
@@ -1195,6 +1196,59 @@ const server = createServer(async (req, res) => {
     if (pathname === '/api/gmail/ontkoppel' && req.method === 'POST') {
       verwijderGmailSleutels();
       return sendJson(res, 200, { gekoppeld: false });
+    }
+
+    /* ── OV ──────────────────────────────────────────────────────────────
+       Onze eigen dienstregeling, geen sleutel nodig. Dezelfde planner als de
+       MCP-server en de stagebot gebruiken. */
+
+    if (pathname === '/api/ov/status' && req.method === 'GET') {
+      if (!isGeimporteerd()) {
+        return sendJson(res, 200, { geimporteerd: false });
+      }
+      const net = laadNet();
+      return sendJson(res, 200, {
+        geimporteerd: true,
+        reizen: net.reizen.length,
+        haltes: net.stops.length,
+        routes: net.routes.length,
+        gegenereerd: net.gegenereerd,
+        bron: net.bron,
+      });
+    }
+
+    if (pathname === '/api/ov/reis' && req.method === 'GET') {
+      if (!isGeimporteerd()) {
+        return sendJson(res, 503, { error: 'Nog geen dienstregeling. Draai: node ov/import.mjs' });
+      }
+      const van = url.searchParams.get('van') ?? 'Roosendaal';
+      const naar = url.searchParams.get('naar');
+      if (!naar) return sendJson(res, 400, { error: 'Geef een bestemming (?naar=Breda).' });
+
+      try {
+        const net = laadNet();
+        const datum = url.searchParams.get('datum');
+        const reizen = plan(net, {
+          van,
+          naar,
+          datum: datum ? new Date(datum) : undefined,
+          vertrek: url.searchParams.get('vertrek') ?? '08:30',
+          aantal: Number(url.searchParams.get('aantal') ?? 3),
+        });
+        return sendJson(res, 200, { van, naar, reizen });
+      } catch (fout) {
+        return sendJson(res, 400, { error: fout.message });
+      }
+    }
+
+    if (pathname === '/api/ov/stations' && req.method === 'GET') {
+      if (!isGeimporteerd()) {
+        return sendJson(res, 503, { error: 'Nog geen dienstregeling. Draai: node ov/import.mjs' });
+      }
+      const net = laadNet();
+      const haltes = zoekHaltes(net, url.searchParams.get('q') ?? '');
+      const namen = [...new Set(haltes.map((i) => net.stops[i].naam))].slice(0, 30);
+      return sendJson(res, 200, { stations: namen });
     }
 
     /* ── stagebot ─────────────────────────────────────────────────────────

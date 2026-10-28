@@ -1,113 +1,135 @@
-# OV: reistijden met de trein
+# OV: reistijden uit eigen data
 
-De stagezoektocht gaat over bereikbaarheid. Een bedrijf in Breda is tweeëntwintig
-kilometer van Roosendaal, maar met de trein ben je er in een kwartier — en een
-bedrijf in een dorp zonder station kan dichterbij zijn en toch slechter te
-bereiken. Daarom haalt de stagebot de echte reistijd op bij de NS.
+Een stagezoektocht gaat over bereikbaarheid. Een bedrijf in Breda is
+tweeëntwintig kilometer van Roosendaal, maar met de trein ben je er in achttien
+minuten — en een bedrijf in een dorp zonder station kan dichterbij zijn en toch
+slechter te bereiken.
+
+Daarom rekent het project de reis zelf uit, op een eigen kopie van de
+dienstregeling.
 
 ```
-Roosendaal  →  station bij het bedrijf  →  lopen of fietsen
-   (trein)          (NS-API)                 (km, uit OSM)
+GTFS (open data)  →  ov/import.mjs  →  data/ov/net.json  →  planner  →  reistijd
 ```
 
-## Een sleutel aanvragen
+## Waarom niet de NS-API
 
-1. Maak een account op <https://apiportal.ns.nl>.
-2. Neem het **gratis product "Ns-App"**.
-3. Kopieer de **Primary key**.
-4. Zet hem in `.env`:
+De NS-API werkt met een sleutel die je via een portaal moet aanvragen, en dat
+portaal kwam er niet uit. Open data is er ook: **OVapi** publiceert elke dag een
+GTFS-bestand met de volledige dienstregeling van alle vervoerders in Nederland.
+Geen sleutel, geen account, geen aanvraaglimiet.
 
-   ```
-   NS_SUBSCRIPTION_KEY=...
-   ```
+De prijs is formaat: 213 MB zip met een `stop_times.txt` van vijftien miljoen
+regels. Dat lees je één keer in, en daarna niet meer.
 
-Zonder sleutel werkt alles behalve de reistijden: het stage-scherm valt dan
-terug op de afstand tot het station. Er wordt niets verzonnen en er verschijnt
-geen "0 minuten".
+## Eenmalig inlezen
 
-## Wat er opgevraagd wordt
+```bash
+node ov/import.mjs
+```
 
-| Endpoint | Waarvoor |
+Wat er gebeurt:
+
+| Stap | Wat |
 |---|---|
-| `/reisinformatie-api/api/v3/trips` | reisadvies: duur, overstappen, sporen |
-| `/reisinformatie-api/api/v2/departures` | de volgende treinen vanaf een station |
-| `/reisinformatie-api/api/v2/stations` | stations zoeken op naam of code |
-| `/reisinformatie-api/api/v3/disruptions` | storingen en werkzaamheden |
+| downloaden | ± 200 MB van `gtfs.ovapi.nl`, ongeveer 40 seconden |
+| inpakken | het zip-bestand wordt gelezen zonder pakketten, met zlib |
+| filteren | alleen treinroutes (`route_type=2`) |
+| bijsnijden | alleen reizen die binnen 45 km van Roosendaal komen (`--alles` houdt heel Nederland) |
+| wegschrijven | `data/ov/net.json`, ± 3 MB |
 
-Alles met de header `Ocp-Apim-Subscription-Key`. De client staat in
-[`mcp/ns/lib/client.mjs`](../mcp/ns/lib/client.mjs) en peltt de verpakking eraf:
-het ene endpoint levert `{ trips: [...] }`, het andere
-`{ payload: { departures: [...] } }`. De rest van het project ziet één vorm.
+Uitkomst van de laatste run: **8.005 treinreizen, 497 haltes, 176 routes**.
+Het bestand wordt niet in git bewaard (`data/ov/` staat in `.gitignore`) — je
+maakt het op elke machine opnieuw met één commando.
+
+Opnieuw doen hoeft pas bij een nieuwe dienstregeling (twee keer per jaar), of
+als je een halte mist.
+
+## Hoe de reis berekend wordt
+
+`ov/lib/planner.mjs` zoekt in de dienstregeling:
+
+1. **de dag** — standaard de volgende werkdag. Een zaterdagdienstregeling zegt
+   niets over of je er kunt komen werken.
+2. **de haltes** — een station heeft vaak meerdere perrons; die horen bij elkaar.
+3. **de reizen** — elke trein die je vanaf de vertrekhalte kunt pakken, binnen
+   drie uur na je vertrektijd (standaard 08:30).
+4. **overstappen** — per trein wordt elke tussenhalte bekeken: is er binnen
+   twee minuten een aansluiting naar de bestemming?
+5. **de drie vroegst aankomende opties**, zonder dubbelen.
+
+Geen volledige RAPTOR: dat is nodig voor het hele land inclusief bussen. Voor
+een treinreis met hooguit één overstap is dit genoeg, en het antwoord is in
+milliseconden.
 
 ## De MCP-server
 
-`mcp/ns/server.mjs` is een eigen MCP-server, los van cavascp: andere bron,
-andere sleutel, ander ritme. Hij staat in het DSH-profiel als `mcp-ns`, dus je
-kunt er in de chat bij:
+`ov/server.mjs`, in het DSH-profiel als `mcp-ov`:
 
 | Tool | Waarvoor |
 |---|---|
-| `ns_reisadvies` | van A naar B, met tijden en overstappen |
-| `ns_reistijd` | de snelste reistijd in één regel |
-| `ns_storingen` | wat er mis is, eventueel rond een station |
-| `ns_vertrektijden` | de volgende treinen vanaf een station |
-| `ns_stations` | stations zoeken |
-| `ns_status` | werkt de koppeling? |
+| `ov_reisadvies` | van A naar B, met tijden, overstappen en de treinen |
+| `ov_reistijd` | de snelste reistijd in één regel |
+| `ov_stations` | stations zoeken |
+| `ov_status` | is er een dienstregeling ingelezen? |
 
-De tools geven tekst terug (markdown), geen JSON — dat leest prettiger in de
-chat en in de CLI.
+## Onze eigen API
+
+Het dashboard serveert dezelfde planner:
+
+| Route | Wat |
+|---|---|
+| `GET /api/ov/reis?van=Roosendaal&naar=Breda&vertrek=08:30` | reisopties |
+| `GET /api/ov/stations?q=breda` |stations zoeken |
+| `GET /api/ov/status` | wat er ingelezen is |
+
+Alles achter dezelfde sessiecookie als de rest van het dashboard.
 
 ## Vanaf de commandoregel
 
 ```bash
-node mcp/ns/cli.mjs status
-node mcp/ns/cli.mjs reis Roosendaal Breda --om 08:30
-node mcp/ns/cli.mjs reistijd Breda
-node mcp/ns/cli.mjs vertrek Breda --richting Roosendaal
-node mcp/ns/cli.mjs storingen --station Breda
-node mcp/ns/cli.mjs stations breda
+node ov/cli.mjs reis Roosendaal Tilburg --om 08:30
+node ov/cli.mjs reistijd Breda
+node ov/cli.mjs stations breda
+node ov/cli.mjs status
+node ov/cli.mjs import
 ```
 
 En in de stagebot:
 
 ```bash
-node stagebot/cli.mjs ov daemen-ict    # reistijd opnieuw opvragen
+node stagebot/cli.mjs ov daemen-ict    # één bedrijf opnieuw
+node stagebot/cli.mjs ov --alles       # alle bedrijven
 ```
 
-## Reistijd in het stage-scherm
+## In het stage-scherm
 
 Na het scannen van een bedrijf vraagt de stagebot de reistijd op vanaf jouw
 station (`stage.ovVan` in je profiel, standaard Roosendaal) naar het station bij
-dat bedrijf. Dat gebeurt met de **volgende werkdag om 08:30**, niet met "nu":
-je zoekt een stage, geen trein van vanavond.
+dat bedrijf. Dat staat als `🚆 18 min` naast de OV-chip, en in het detail als
+`Roosendaal → Breda: 18 min, 0 overstappen`.
 
-De uitkomst staat in het scherm als `🚆 26 min · 1× over` naast de OV-chip, en
-in het detail als `Roosendaal → Breda: 26 min, 1 overstap`.
+Uitkomsten worden zeven dagen bewaard (`data/stagebot/cache/reistijden.json`),
+want een dienstregeling verandert niet per dag.
 
-Wat er gecachet wordt:
+## Wat het niet doet
 
-| Wat | Hoe lang | Waarom |
-|---|---|---|
-| stations (OSM/Overpass) | 7 dagen | er komt zelden een station bij |
-| reistijden per station-paar | 7 dagen | dienstregelingen veranderen twee keer per jaar |
-| NS-antwoorden (MCP) | 2 uur | storingen veranderen per uur |
-
-## Wat dit niet is
-
-- **Alleen de trein.** Bus, tram en de OV-fiets zitten er niet in; de laatste
+- **Alleen trein.** Bus, tram en metro zitten niet in de berekening. De laatste
   kilometers staan er apart bij als afstand tot het station.
-- **Geen live reisplanner voor onderweg.** De storingstool is er wel, maar de
-  mail gaat over een stage, niet over een gemiste aansluiting.
-- **Geen garantie.** De NS-API is een dienst van een ander; ligt hij eruit, dan
-  blijft de reistijd leeg en zie je de kilometer-aanduiding.
+- **Geen live storingen.** De dienstregeling is een plan, geen werkelijkheid.
+  Voor live data is er een aparte module (`mcp/ns/`) die de NS-API gebruikt —
+  die werkt alleen met een sleutel en is daarom niet gekoppeld.
+- **Nederland.** Belgische haltes ontbreken, dus een bedrijf over de grens
+  levert "geen reis gevonden" op.
+- **Geen spoorinformatie.** GTFS weet het perron niet; de reis zegt alleen
+  welke trein en hoe laat.
 
 ## Testen
 
 ```bash
-node mcp/ns/test-ns.mjs
+node ov/test-ov.mjs
 ```
 
-19 checks tegen een nepserver die dezelfde paden beantwoordt: reisadvies
-uitlezen, overstappen tellen, vertraging berekenen, filteren op station en
-richting, en een 401 die een duidelijke fout moet geven. Er gaat geen enkele
-aanvraag naar de echte NS en je hebt er geen sleutel voor nodig.
+24 checks op een nagemaakte dienstregeling met vier haltes: directe reis,
+overstap, te late aankomst, een dag zonder dienst, onbekende bestemming en de
+tijdnotatie. Geen GTFS-bestand nodig, geen netwerk.

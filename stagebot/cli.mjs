@@ -18,7 +18,7 @@ import { aiBeschikbaar, vindSleutel } from './lib/deepseek.mjs';
 import { zoekBedrijven, voegKandidatenToe, seedKandidaten, voegUrlToe } from './lib/zoeken.mjs';
 import { leesEnSchrijf } from './lib/pijplijn.mjs';
 import { herberekenVoorBedrijf } from './lib/reistijd.mjs';
-import { nsBeschikbaar } from '../mcp/ns/lib/client.mjs';
+import { isGeimporteerd } from '../ov/lib/planner.mjs';
 import { verstuurBedrijf, verstuurGoedgekeurd, kiesAdres } from './lib/versturen.mjs';
 import { vindGmailSleutels } from './lib/gmail.mjs';
 import { readFileSync } from 'node:fs';
@@ -181,8 +181,8 @@ async function main() {
 
     case 'ov': {
       if (rest.includes('--alles')) {
-        if (!nsBeschikbaar()) {
-          console.log('\n  Geen NS-sleutel. Zet NS_SUBSCRIPTION_KEY in .env (https://apiportal.ns.nl).\n');
+        if (!isGeimporteerd()) {
+          console.log('\n  Geen dienstregeling. Draai eerst: node ov/import.mjs\n');
           return 1;
         }
         const bedrijven = leesBedrijven().bedrijven.filter((b) => b.station?.naam);
@@ -216,8 +216,8 @@ async function main() {
         console.log('  welk bedrijf? bijvoorbeeld: node stagebot/cli.mjs ov daemen-ict');
         return 1;
       }
-      if (!nsBeschikbaar()) {
-        console.log('\n  Geen NS-sleutel. Zet NS_SUBSCRIPTION_KEY in .env (https://apiportal.ns.nl).\n');
+      if (!isGeimporteerd()) {
+        console.log('\n  Geen dienstregeling. Draai eerst: node ov/import.mjs\n');
         return 1;
       }
       const bedrijf = zoekBedrijf(id);

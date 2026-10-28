@@ -107,13 +107,13 @@ hemelsbrede afstand tot het dichtstbijzijnde station en noemt dat:
 | verder | meer dan 4 km |
 | onbekend | geen coördinaten bekend |
 
-Met een NS-sleutel komt daar de **echte treinreis** bij: de stagebot vraagt de
-reistijd op vanaf jouw station naar het station bij het bedrijf, met de volgende
-werkdag om 08:30 als uitgangspunt. Dat staat als `🚆 26 min · 1× over` in het
-scherm. Zie `docs/ov.md`.
+Daarnaast komt de **echte treinreis**: de stagebot rekent de reistijd uit met de
+eigen dienstregeling (open data via OVapi), vanaf jouw station naar het station
+bij het bedrijf, met de volgende werkdag om 08:30 als uitgangspunt. Dat staat
+als `🚆 26 min · 1× over` in het scherm. Zie `docs/ov.md`.
 
-Zonder die sleutel blijft het bij de afstand — een proxy, geen reistijd: er zit
-dan geen routeplanner achter. Een bedrijf op
+Is de dienstregeling niet ingelezen (`node ov/import.mjs`), dan blijft het bij
+de afstand — een proxy, geen reistijd: er zit dan geen routeplanner achter. Een bedrijf op
 anderhalve kilometer van een station in een dorp zonder rechtstreekse trein kan
 in de praktijk twee overstappen kosten. De afstand staat erbij, dus je kunt zelf
 inschatten of het te doen is. Een tilde (`~`) betekent dat de locatie uit een
