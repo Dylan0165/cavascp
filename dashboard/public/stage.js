@@ -111,6 +111,7 @@ function renderKop() {
 
   $('#quota').textContent = `${o.gedaan} / ${o.limiet} vandaag`;
   $('#gmail').textContent = o.gmail?.gekoppeld ? `Gmail: ${o.gmail.gebruiker}` : 'Gmail niet gekoppeld';
+  $('#teams').textContent = o.teams?.gekoppeld ? 'Teams: aan' : 'Teams niet gekoppeld';
 
   const stage = o.profiel?.stage ?? {};
   const delen = [
@@ -469,6 +470,68 @@ async function ontkoppelGmail() {
   }
 }
 
+/* ───────────────────────────── teams koppelen ─────────────────────────── */
+
+function teamsFout(tekst) {
+  $('#teams-fout').textContent = tekst || '';
+}
+
+function openTeams() {
+  const gekoppeld = Boolean(state.overzicht?.teams?.gekoppeld);
+  $('#teams-url').value = '';
+  $('#teams-meldingen').checked = true;
+  $('#teams-test').hidden = !gekoppeld;
+  $('#teams-ontkoppel').hidden = !gekoppeld;
+  $('#teams-koppel').textContent = gekoppeld ? 'Opnieuw koppelen' : 'Koppelen';
+  teamsFout('');
+  $('#teams-dialoog').showModal();
+}
+
+async function koppelTeams(gebeurtenis) {
+  gebeurtenis.preventDefault();
+  teamsFout('');
+  const url = $('#teams-url').value.trim();
+  const meldingen = $('#teams-meldingen').checked;
+  const knop = $('#teams-koppel');
+  knop.disabled = true;
+  knop.textContent = 'Proefbericht sturen…';
+
+  try {
+    await api('/api/teams/koppel', { body: { url, meldingen } });
+    await laad();
+    $('#teams-dialoog').close();
+    melding('Teams gekoppeld — je krijgt bericht als er een mail de deur uit gaat.');
+  } catch (fout) {
+    teamsFout(fout.message);
+  } finally {
+    knop.disabled = false;
+    knop.textContent = 'Koppelen';
+  }
+}
+
+async function testTeams() {
+  teamsFout('');
+  try {
+    await api('/api/teams/test', { body: {} });
+    teamsFout('');
+    melding('Proefbericht verstuurd — kijk in je kanaal.');
+  } catch (fout) {
+    teamsFout(fout.message);
+  }
+}
+
+async function ontkoppelTeams() {
+  if (!window.confirm('Teams ontkoppelen? Je krijgt dan geen meldingen meer.')) return;
+  try {
+    await api('/api/teams/ontkoppel', { body: {} });
+    await laad();
+    $('#teams-dialoog').close();
+    melding('Teams ontkoppeld.');
+  } catch (fout) {
+    teamsFout(fout.message);
+  }
+}
+
 async function verstuur(b) {
   if (state.bezig) return;
   const naar = (b.emails ?? [])[0];
@@ -655,6 +718,11 @@ function start() {
   $('#dagrun').addEventListener('click', dagrun);
   $('#verstuur-alles').addEventListener('click', verstuurAlles);
   $('#gmail').addEventListener('click', openGmail);
+  $('#teams').addEventListener('click', openTeams);
+  $('#teams-vorm').addEventListener('submit', koppelTeams);
+  $('#teams-test').addEventListener('click', testTeams);
+  $('#teams-ontkoppel').addEventListener('click', ontkoppelTeams);
+  $('#teams-sluit').addEventListener('click', () => $('#teams-dialoog').close());
   $('#logout').addEventListener('click', async () => {
     await fetch('/api/auth/logout', { method: 'POST' });
     location.href = '/login';

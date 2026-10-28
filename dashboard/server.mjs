@@ -52,6 +52,14 @@ import { verstuurBedrijf, verstuurGoedgekeurd, kiesAdres } from '../stagebot/lib
 import { gmailBeschikbaar, vindGmailSleutels, bewaarGmailSleutels, verwijderGmailSleutels, controleerGmailLogin } from '../stagebot/lib/gmail.mjs';
 import { leesProfiel } from '../stagebot/lib/profiel.mjs';
 import { laadNet, plan, zoekHaltes, isGeimporteerd } from '../ov/lib/planner.mjs';
+import {
+  teamsBeschikbaar,
+  vindTeamsWebhook,
+  bewaarTeamsWebhook,
+  verwijderTeamsWebhook,
+  verstuurTeams,
+  maakTeamsBericht,
+} from '../stagebot/lib/teams.mjs';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const PUBLIC_DIR = path.join(HERE, 'public');
@@ -600,6 +608,7 @@ function stageOverzicht() {
     verstuurd: alle
       .filter((b) => ['verstuurd', 'geantwoord', 'gesprek', 'klaar'].includes(b.status))
       .map(stageLicht),
+    teams: { gekoppeld: teamsBeschikbaar() },
     gmail: gmailBeschikbaar()
       ? { gekoppeld: true, gebruiker: vindGmailSleutels()?.gebruiker ?? null }
       : { gekoppeld: false, gebruiker: null },
@@ -1154,6 +1163,70 @@ const server = createServer(async (req, res) => {
     /* ── Gmail koppelen ───────────────────────────────────────────────────
        De inloggegevens komen uit het scherm, worden eerst bij Gmail getest en
        pas daarna bewaard. Ze gaan nooit terug naar de browser. */
+
+    /* ── Teams ────────────────────────────────────────────────────────────
+       Een Power Automate-webhook. De URL is een geheim: wie hem heeft kan in
+       je kanaal posten. Daarom wordt hij bewaard zoals de Gmail-sleutel en
+       nooit terug naar de browser gestuurd — het scherm ziet alleen dát het
+       gekoppeld is. */
+
+    if (pathname === '/api/teams' && req.method === 'GET') {
+      const webhook = vindTeamsWebhook();
+      return sendJson(res, 200, {
+        gekoppeld: Boolean(webhook),
+        meldingen: webhook?.meldingen ?? false,
+        bron: webhook?.bron ?? null,
+      });
+    }
+
+    if (pathname === '/api/teams/koppel' && req.method === 'POST') {
+      if (!security.rateLimitOk({ emmer: 'mail', limiet: 20 })) {
+        return sendJson(res, 429, { error: 'Te veel pogingen. Even wachten.' });
+      }
+      const body = await readBody(req);
+      const url = String(body.url ?? '').trim();
+      const meldingen = body.meldingen !== false;
+
+      try {
+        // Eerst een proefkaart: pas als Teams hem aanneemt, bewaren we de URL.
+        await verstuurTeams(
+          maakTeamsBericht({
+            titel: 'Stagebot is gekoppeld',
+            tekst: 'Vanaf nu krijg je hier bericht als er een mail de deur uit gaat.',
+            feiten: [['Gekoppeld op', new Date().toLocaleString('nl-NL')]],
+          }),
+          { url },
+        );
+        bewaarTeamsWebhook(url, { meldingen });
+      } catch (fout) {
+        return sendJson(res, 400, { error: fout.message });
+      }
+
+      console.log('  Teams gekoppeld');
+      return sendJson(res, 200, { gekoppeld: true, meldingen });
+    }
+
+    if (pathname === '/api/teams/ontkoppel' && req.method === 'POST') {
+      verwijderTeamsWebhook();
+      return sendJson(res, 200, { gekoppeld: false });
+    }
+
+    if (pathname === '/api/teams/test' && req.method === 'POST') {
+      if (!security.rateLimitOk({ emmer: 'mail', limiet: 20 })) {
+        return sendJson(res, 429, { error: 'Te veel pogingen. Even wachten.' });
+      }
+      try {
+        await verstuurTeams(
+          maakTeamsBericht({
+            titel: 'Proefbericht',
+            tekst: 'Als je dit ziet, werkt de koppeling.',
+          }),
+        );
+        return sendJson(res, 200, { ok: true });
+      } catch (fout) {
+        return sendJson(res, 502, { error: fout.message });
+      }
+    }
 
     if (pathname === '/api/gmail' && req.method === 'GET') {
       const sleutels = vindGmailSleutels();

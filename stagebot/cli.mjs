@@ -21,6 +21,7 @@ import { herberekenVoorBedrijf } from './lib/reistijd.mjs';
 import { isGeimporteerd } from '../ov/lib/planner.mjs';
 import { verstuurBedrijf, verstuurGoedgekeurd, kiesAdres } from './lib/versturen.mjs';
 import { vindGmailSleutels } from './lib/gmail.mjs';
+import { vindTeamsWebhook, bewaarTeamsWebhook, verstuurTeams, maakTeamsBericht } from './lib/teams.mjs';
 import { readFileSync } from 'node:fs';
 
 const [, , commando, ...rest] = process.argv;
@@ -38,6 +39,7 @@ function gebruik() {
     node stagebot/cli.mjs ov <id>         reistijd met de trein opnieuw opvragen
     node stagebot/cli.mjs ov --alles      reistijd voor alle bedrijven opnieuw
     node stagebot/cli.mjs gmail           is Gmail gekoppeld? (--test stuurt een proefmail)
+    node stagebot/cli.mjs teams           is Teams gekoppeld? (--test, --zet <url>)
     node stagebot/cli.mjs verstuur <id>   de mail van dat bedrijf echt versturen
     node stagebot/cli.mjs verstuur --alles alles wat goedgekeurd is
     node stagebot/cli.mjs voeg <url>      zelf een bedrijf toevoegen
@@ -238,6 +240,47 @@ async function main() {
         `\n  ${bedrijf.titel}: ${reistijd.van} → ${reistijd.naar} — ${reistijd.minuten} min, ` +
           `${reistijd.overstappen} overstap${reistijd.overstappen === 1 ? '' : 'pen'}\n`,
       );
+      return 0;
+    }
+
+    case 'teams': {
+      const zetIndex = rest.indexOf('--zet');
+      if (zetIndex !== -1) {
+        const url = rest[zetIndex + 1];
+        if (!url) {
+          console.log('  welke url? bijvoorbeeld: node stagebot/cli.mjs teams --zet https://prod-...logic.azure.com/...');
+          return 1;
+        }
+        try {
+          await verstuurTeams(maakTeamsBericht({ titel: 'Stagebot is gekoppeld', tekst: 'Proefbericht.' }), { url });
+          bewaarTeamsWebhook(url);
+          console.log('\n  Gekoppeld. Er is een proefbericht naar Teams gestuurd.\n');
+          return 0;
+        } catch (fout) {
+          console.log(`\n  Mislukt: ${fout.message}\n`);
+          return 1;
+        }
+      }
+
+      const webhook = vindTeamsWebhook();
+      if (!webhook) {
+        console.log('\n  Teams is nog niet gekoppeld.');
+        console.log('  Maak een flow in Teams (Workflows → "When a Teams webhook request is received")');
+        console.log('  en zet de URL hier neer:');
+        console.log('    node stagebot/cli.mjs teams --zet <url>\n');
+        return 1;
+      }
+
+      console.log(`\n  Teams: gekoppeld (${webhook.bron === 'omgeving' ? 'uit de omgeving' : 'uit het scherm of .env'})`);
+      console.log(`  Meldingen: ${webhook.meldingen ? 'aan' : 'uit'}`);
+
+      if (rest.includes('--test')) {
+        await verstuurTeams(maakTeamsBericht({ titel: 'Proefbericht', tekst: 'Als je dit ziet, werkt de koppeling.' }));
+        console.log('  Proefbericht verstuurd.\n');
+        return 0;
+      }
+
+      console.log('  Probeer: node stagebot/cli.mjs teams --test\n');
       return 0;
     }
 

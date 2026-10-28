@@ -104,6 +104,8 @@
   }
   .dialoog input:focus-visible { outline: 2px solid var(--green-500); outline-offset: 1px; }
   .dialoog__fout { color: var(--clay-400); font-size: var(--text-sm); min-height: 1.2rem; margin: .25rem 0 .75rem; }
+  .dialoog__check { display: flex; gap: .5rem; align-items: center; font-size: var(--text-sm); color: var(--ink-2); margin: .25rem 0 .5rem; }
+  .dialoog__check input { width: auto; margin: 0; }
   .voortgang { font-size: var(--text-sm); color: var(--ink-2); font-family: var(--font-mono); }
 </style>
 </head>
@@ -120,6 +122,7 @@
   <div class="topbar__right">
     <span class="quota" id="quota">—</span>
     <button class="quota quota--knop" id="gmail" type="button" title="Gmail koppelen of ontkoppelen">Gmail: —</button>
+    <button class="quota quota--knop" id="teams" type="button" title="Meldingen naar Teams">Teams: —</button>
     <button id="logout" class="btn btn--ghost" type="button" title="Sessie beëindigen">Uitloggen</button>
     <button id="theme" class="btn btn--icon" type="button" title="Wissel licht/donker" aria-label="Wissel licht/donker thema">◐</button>
   </div>
@@ -158,6 +161,34 @@
   </div>
 
 </main>
+
+<dialog id="teams-dialoog" class="dialoog">
+  <form id="teams-vorm" autocomplete="off">
+    <h2>Teams koppelen</h2>
+    <p class="dialoog__uitleg">
+      Maak in Teams een flow met de trigger <em>“When a Teams webhook request is received”</em>
+      en een actie die de kaart in een kanaal of chat post. De URL die je dan krijgt,
+      plak je hier. Je krijgt bericht als er een mail de deur uit gaat.
+    </p>
+
+    <label for="teams-url">Webhook-URL</label>
+    <input id="teams-url" type="url" placeholder="https://prod-…logic.azure.com/…" required>
+
+    <label class="dialoog__check">
+      <input id="teams-meldingen" type="checkbox" checked>
+      Melding bij elke verstuurde mail
+    </label>
+
+    <p class="dialoog__fout" id="teams-fout" role="alert"></p>
+
+    <div class="acties">
+      <button type="submit" class="btn" id="teams-koppel">Koppelen</button>
+      <button type="button" class="btn btn--ghost" id="teams-test" hidden>Proefbericht</button>
+      <button type="button" class="btn btn--ghost" id="teams-ontkoppel" hidden>Ontkoppelen</button>
+      <button type="button" class="btn btn--ghost" id="teams-sluit">Sluiten</button>
+    </div>
+  </form>
+</dialog>
 
 <dialog id="gmail-dialoog" class="dialoog">
   <form id="gmail-vorm" autocomplete="off">

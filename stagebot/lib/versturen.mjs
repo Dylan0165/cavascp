@@ -16,6 +16,7 @@
 import { zoekBedrijf, werkBij, leesBedrijven } from './bedrijven.mjs';
 import { leesProfiel } from './profiel.mjs';
 import { verstuurMail, gmailBeschikbaar } from './gmail.mjs';
+import { meldTeams, maakTeamsBericht } from './teams.mjs';
 
 /** Adressen die je nooit wilt gebruiken. */
 const ONGELDIG = /^(noreply|no-reply|postmaster|abuse|webmaster)@/i;
@@ -39,7 +40,7 @@ export function kiesAdres(bedrijf) {
  * @param {string} id
  * @param {{droog?: boolean}} [opties]  droog = alles doen behalve echt versturen
  */
-export async function verstuurBedrijf(id, { droog = false } = {}) {
+export async function verstuurBedrijf(id, { droog = false, stil = false } = {}) {
   const bedrijf = zoekBedrijf(id);
   if (!bedrijf) throw new Error(`Onbekend bedrijf: ${id}`);
   if (!bedrijf.mail?.volledig) throw new Error(`${bedrijf.titel}: er is nog geen mail geschreven`);
@@ -79,6 +80,23 @@ export async function verstuurBedrijf(id, { droog = false } = {}) {
     };
   });
 
+  /*
+   * Een melding in Teams. Best effort: ligt Teams eruit, dan is de mail nog
+   * steeds verstuurd en mag er niets stukgaan.
+   */
+  if (!droog && !stil) {
+    await meldTeams(
+      maakTeamsBericht({
+        titel: `Mail verstuurd: ${bedrijf.titel}`,
+        tekst: bedrijf.mail.onderwerp,
+        feiten: [
+          ['Naar', naar],
+          ['Bedrijf', bedrijf.titel],
+        ],
+      }),
+    );
+  }
+
   return { bedrijf: opgeslagen, naar, messageId: resultaat.messageId ?? null, droog };
 }
 
@@ -96,12 +114,23 @@ export async function verstuurGoedgekeurd({ limiet = 20, droog = false } = {}) {
   // verbindingen tegelijk vanaf hetzelfde account.
   for (const bedrijf of wachtOpGoedkeuring(limiet)) {
     try {
-      const uitkomst = await verstuurBedrijf(bedrijf.id, { droog });
+      const uitkomst = await verstuurBedrijf(bedrijf.id, { droog, stil: true });
       klaar.push(uitkomst);
     } catch (fout) {
       mislukt.push({ bedrijf: bedrijf.titel, fout: fout.message });
     }
     await new Promise((r) => setTimeout(r, 1200));
+  }
+
+  // Eén samenvatting in plaats van twintig losse meldingen.
+  if (klaar.length && !droog) {
+    await meldTeams(
+      maakTeamsBericht({
+        titel: `${klaar.length} mail${klaar.length === 1 ? '' : 's'} verstuurd`,
+        tekst: mislukt.length ? `${mislukt.length} mislukt — zie het scherm.` : 'Alles is de deur uit.',
+        feiten: klaar.slice(0, 6).map((k) => [k.bedrijf.titel, k.naar]),
+      }),
+    );
   }
 
   return { klaar, mislukt };
