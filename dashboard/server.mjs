@@ -563,6 +563,7 @@ function stageLicht(b) {
     locatieBron: b.locatieBron ?? null,
     vanHuisKm: b.vanHuisKm ?? null,
     station: b.station ?? null,
+    reistijd: b.reistijd ?? null,
     status: b.status,
     statusLabel: STATUS[b.status] ?? b.status,
     dag: b.dag ?? null,

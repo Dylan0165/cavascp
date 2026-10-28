@@ -17,9 +17,15 @@
 
 import assert from 'node:assert/strict';
 import net from 'node:net';
+import { mkdtempSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import path from 'node:path';
 
 process.env.GMAIL_USER = 'test@example.com';
 process.env.GMAIL_APP_PASSWORD = 'abcd efgh ijkl mnop';
+
+// Eigen datamap: de test mag nooit de echte Gmail-koppeling tegenkomen.
+process.env.CAVASCP_DATA_DIR = mkdtempSync(path.join(tmpdir(), 'stagebot-smtp-'));
 
 const { verstuurMail, codeerOnderwerp, maakMime } = await import('./lib/gmail.mjs');
 

@@ -10,6 +10,7 @@ import { scanBedrijf } from './scan.mjs';
 import { voegToe, werkBij, zoekBedrijf, vandaag } from './bedrijven.mjs';
 import { geocodeBedrijf } from './geo.mjs';
 import { laadStations, beoordeelLocatie, vindPlaats } from './regio.mjs';
+import { berekenReistijd } from './reistijd.mjs';
 import { schrijfMail, keurMail } from './mail.mjs';
 import { leesProfiel } from './profiel.mjs';
 
@@ -81,6 +82,12 @@ export async function leesEnSchrijf(bedrijfId, { dag = vandaag() } = {}) {
       });
     }
   }
+
+  /*
+   * De reistijd met de trein. Lukt dat niet (geen NS-sleutel, geen station),
+   * dan blijft het leeg — de kilometer-aanduiding staat er dan nog wel.
+   */
+  await berekenReistijd(bedrijf).catch(() => null);
 
   const profiel = leesProfiel();
   const mail = await schrijfMail(bedrijf, { profiel });

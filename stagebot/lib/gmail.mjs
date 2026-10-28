@@ -46,15 +46,25 @@ const TIMEOUT_MS = 45_000;
 /**
  * Waar staan de inloggegevens?
  *
- * Dezelfde volgorde als het taalmodel: het .env van dit project, dan het
- * .env in je thuismap, dan dat van KravaDoc. Zo hoef je het maar op één plek
- * te zetten.
+ * Eerst de omgeving, dan de koppeling uit het scherm, dan een .env-bestand.
+ * Zie de uitleg in de functie zelf.
  */
 export function vindGmailSleutels() {
   /*
-   * Eerst de koppeling die je in het scherm hebt gelegd. Die is het meest
-   * recent en het minst foutgevoelig (geen handmatig bewerken van .env).
+   * Drie bronnen, in deze volgorde:
+   *   1. de omgeving — expliciet meegegeven wint altijd (tests, systemd)
+   *   2. de koppeling uit het scherm (data/stagebot/gmail.json)
+   *   3. een .env-bestand, voor als je het met de hand hebt ingesteld
    */
+  if (process.env.GMAIL_USER && process.env.GMAIL_APP_PASSWORD) {
+    return {
+      gebruiker: process.env.GMAIL_USER,
+      wachtwoord: process.env.GMAIL_APP_PASSWORD.replace(/\s+/g, ''),
+      bron: 'omgeving',
+      alleenLeesbaarVoorJou: true,
+    };
+  }
+
   if (existsSync(KOPPEL_PAD)) {
     try {
       const data = JSON.parse(readFileSync(KOPPEL_PAD, 'utf8'));
@@ -69,20 +79,6 @@ export function vindGmailSleutels() {
     } catch {
       /* stuk bestand: val terug op .env */
     }
-  }
-
-  /*
-   * En de omgeving. Handig voor een test die een nepserver gebruikt, en
-   * voor een machine waar de sleutel via systemd wordt meegegeven in plaats
-   * van in een bestand te staan.
-   */
-  if (process.env.GMAIL_USER && process.env.GMAIL_APP_PASSWORD) {
-    return {
-      gebruiker: process.env.GMAIL_USER,
-      wachtwoord: process.env.GMAIL_APP_PASSWORD.replace(/\s+/g, ''),
-      bron: 'omgeving',
-      alleenLeesbaarVoorJou: true,
-    };
   }
 
   const kandidaten = [vindEnv(), inProject('.env'), path.join(process.env.HOME ?? '', '.dsh', '.env')].filter(

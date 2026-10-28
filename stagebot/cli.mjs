@@ -17,6 +17,8 @@ import { leesProfiel, bewaarProfiel, profielAlsTekst, verrijkVanuitCanvas } from
 import { aiBeschikbaar, vindSleutel } from './lib/deepseek.mjs';
 import { zoekBedrijven, voegKandidatenToe, seedKandidaten, voegUrlToe } from './lib/zoeken.mjs';
 import { leesEnSchrijf } from './lib/pijplijn.mjs';
+import { herberekenVoorBedrijf } from './lib/reistijd.mjs';
+import { nsBeschikbaar } from '../mcp/ns/lib/client.mjs';
 import { verstuurBedrijf, verstuurGoedgekeurd, kiesAdres } from './lib/versturen.mjs';
 import { vindGmailSleutels } from './lib/gmail.mjs';
 import { readFileSync } from 'node:fs';
@@ -33,6 +35,8 @@ function gebruik() {
     node stagebot/cli.mjs zoek            bedrijven zoeken in de regio (OSM + je eigen lijst)
     node stagebot/cli.mjs dag             twintig kandidaten lezen en mail schrijven
     node stagebot/cli.mjs status          wat staat er in de wachtrij, en hoe ver is vandaag
+    node stagebot/cli.mjs ov <id>         reistijd met de trein opnieuw opvragen
+    node stagebot/cli.mjs ov --alles      reistijd voor alle bedrijven opnieuw
     node stagebot/cli.mjs gmail           is Gmail gekoppeld? (--test stuurt een proefmail)
     node stagebot/cli.mjs verstuur <id>   de mail van dat bedrijf echt versturen
     node stagebot/cli.mjs verstuur --alles alles wat goedgekeurd is
@@ -152,10 +156,16 @@ async function main() {
       for (const kandidaat of kandidaten) {
         console.log(`\n  ${kandidaat.titel} (${kandidaat.domein})`);
         try {
-          const { keuring } = await leesEnSchrijf(kandidaat.id);
+          const { bedrijf, keuring } = await leesEnSchrijf(kandidaat.id);
           gelukt += 1;
           const oordeel = keuring.goed ? 'in orde' : `let op: ${keuring.punten.join('; ')}`;
           console.log(`     mail geschreven — ${keuring.woorden} woorden, ${oordeel}`);
+          if (bedrijf.reistijd?.minuten != null) {
+            console.log(
+              `     met de trein: ${bedrijf.reistijd.minuten} min, ${bedrijf.reistijd.overstappen} overstap` +
+                `${bedrijf.reistijd.overstappen === 1 ? '' : 'pen'}`,
+            );
+          }
         } catch (fout) {
           mislukt.push({ bedrijf: kandidaat.titel, fout: fout.message });
           console.log(`     overgeslagen: ${fout.message}`);
@@ -167,6 +177,68 @@ async function main() {
       for (const m of mislukt) console.log(`     ${m.bedrijf}: ${m.fout}`);
       console.log(`  Nog ${dagTelling().over} van vandaag over. Open het dashboard om na te kijken.\n`);
       return gelukt ? 0 : 1;
+    }
+
+    case 'ov': {
+      if (rest.includes('--alles')) {
+        if (!nsBeschikbaar()) {
+          console.log('\n  Geen NS-sleutel. Zet NS_SUBSCRIPTION_KEY in .env (https://apiportal.ns.nl).\n');
+          return 1;
+        }
+        const bedrijven = leesBedrijven().bedrijven.filter((b) => b.station?.naam);
+        if (!bedrijven.length) {
+          console.log('\n  Nog geen bedrijven met een station. Scan eerst iets.\n');
+          return 0;
+        }
+        console.log(`\n  Reistijd opvragen voor ${bedrijven.length} bedrijven…`);
+        let gelukt = 0;
+        for (const bedrijf of bedrijven) {
+          try {
+            const reistijd = await herberekenVoorBedrijf(bedrijf);
+            if (!reistijd) {
+              console.log(`     ${bedrijf.titel}: geen reis gevonden`);
+              continue;
+            }
+            gelukt += 1;
+            console.log(
+              `     ${String(bedrijf.titel).slice(0, 26).padEnd(27)} ${reistijd.minuten} min, ${reistijd.overstappen} overstap${reistijd.overstappen === 1 ? '' : 'pen'}`,
+            );
+          } catch (fout) {
+            console.log(`     ${bedrijf.titel}: ${fout.message}`);
+          }
+        }
+        console.log(`\n  ${gelukt} van ${bedrijven.length} gelukt.\n`);
+        return gelukt ? 0 : 1;
+      }
+
+      const id = rest[0];
+      if (!id) {
+        console.log('  welk bedrijf? bijvoorbeeld: node stagebot/cli.mjs ov daemen-ict');
+        return 1;
+      }
+      if (!nsBeschikbaar()) {
+        console.log('\n  Geen NS-sleutel. Zet NS_SUBSCRIPTION_KEY in .env (https://apiportal.ns.nl).\n');
+        return 1;
+      }
+      const bedrijf = zoekBedrijf(id);
+      if (!bedrijf) {
+        console.log(`  geen bedrijf gevonden voor "${id}"`);
+        return 1;
+      }
+      if (!bedrijf.station?.naam) {
+        console.log(`\n  Van ${bedrijf.titel} is geen station bekend. Scan het bedrijf eerst.\n`);
+        return 1;
+      }
+      const reistijd = await herberekenVoorBedrijf(bedrijf);
+      if (!reistijd) {
+        console.log('\n  De NS gaf geen reis terug voor deze bestemming.\n');
+        return 1;
+      }
+      console.log(
+        `\n  ${bedrijf.titel}: ${reistijd.van} → ${reistijd.naar} — ${reistijd.minuten} min, ` +
+          `${reistijd.overstappen} overstap${reistijd.overstappen === 1 ? '' : 'pen'}\n`,
+      );
+      return 0;
     }
 
     case 'gmail': {

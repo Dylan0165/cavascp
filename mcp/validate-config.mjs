@@ -41,52 +41,70 @@ try {
 console.log(`profiel "${PROFIEL}" laadt: OK`);
 
 /*
- * Het mcp-cavascp-blok uit de samengestelde boom halen. Regelgewijs, want het
- * gaat om één rij met vaste velden; een YAML-parser zou hier alleen maar een
+ * De MCP-rijen uit de samengestelde boom halen. Regelgewijs, want het gaat om
+ * een paar rijen met vaste velden; een YAML-parser zou hier alleen maar een
  * afhankelijkheid toevoegen.
  */
 const regels = dump.split('\n');
-const start = regels.findIndex((r) => r.trim() === '- id: mcp-cavascp');
-if (start === -1) {
-  console.log('FOUT: mcp-cavascp staat niet in het profiel');
-  process.exit(1);
-}
 
-let eind = regels.length;
-for (let i = start + 1; i < regels.length; i += 1) {
-  if (/^- (id|insert):/.test(regels[i])) {
-    eind = i;
-    break;
+/** Het blok van één rij, tot de volgende rij op het hoogste niveau. */
+function blokVan(id) {
+  const start = regels.findIndex((r) => r.trim() === `- id: ${id}`);
+  if (start === -1) return null;
+  let eind = regels.length;
+  for (let i = start + 1; i < regels.length; i += 1) {
+    if (/^- (id|insert):/.test(regels[i])) {
+      eind = i;
+      break;
+    }
   }
+  return { start, tekst: regels.slice(start, eind).join('\n') };
 }
-const blok = regels.slice(start, eind).join('\n');
 
-console.log('');
-console.log(`mcp-cavascp (regel ${start + 1} van de samengestelde configuratie):`);
-for (const regel of blok.split('\n')) console.log(`  ${regel}`);
-
-const eisen = [
-  ['@deepseek-ai/dsh-mcp-client', 'de client-pluginnaam'],
-  ['serverName: cavascp', 'serverName'],
-  ['transport: stdio', 'transport'],
-  ['server.mjs', 'een pad naar server.mjs in args'],
+const SERVERS = [
+  { id: 'mcp-cavascp', serverName: 'cavascp', args: 'mcp/server.mjs' },
+  { id: 'mcp-ns', serverName: 'ns', args: 'mcp/ns/server.mjs' },
 ];
 
-const problemen = eisen.filter(([fragment]) => !blok.includes(fragment)).map(([, wat]) => `${wat} ontbreekt`);
+const problemen = [];
 
-/*
- * Geen `env` is goed: mcp/server.mjs leest het token zelf uit <project>/.env,
- * omdat DSH ambient *TOKEN*-variabelen wegfiltert voordat het proces start.
- * Staat er wél een env, dan moet het een !!js-expressie zijn.
- */
-const heeftEnv = /^\s+env:/m.test(blok);
-if (heeftEnv && !blok.includes('!!js')) problemen.push('env staat er wel, maar niet als !!js-expressie');
+for (const server of SERVERS) {
+  const blok = blokVan(server.id);
+  console.log('');
+  if (!blok) {
+    console.log(`FOUT: ${server.id} staat niet in het profiel`);
+    problemen.push(`${server.id} ontbreekt`);
+    continue;
+  }
+
+  console.log(`${server.id} (regel ${blok.start + 1} van de samengestelde configuratie):`);
+  for (const regel of blok.tekst.split('\n')) console.log(`  ${regel}`);
+
+  const eisen = [
+    ['@deepseek-ai/dsh-mcp-client', 'de client-pluginnaam'],
+    [`serverName: ${server.serverName}`, 'serverName'],
+    ['transport: stdio', 'transport'],
+    [server.args, 'een pad naar de server in args'],
+  ];
+  for (const [fragment, wat] of eisen) {
+    if (!blok.tekst.includes(fragment)) problemen.push(`${server.id}: ${wat} ontbreekt`);
+  }
+
+  /*
+   * Geen `env` is goed: de servers lezen hun sleutel zelf uit <project>/.env,
+   * omdat DSH ambient *TOKEN*-variabelen wegfiltert voordat het proces start.
+   * Staat er wél een env, dan moet het een !!js-expressie zijn.
+   */
+  if (/^\s+env:/m.test(blok.tekst) && !blok.tekst.includes('!!js')) {
+    problemen.push(`${server.id}: env staat er wel, maar niet als !!js-expressie`);
+  }
+}
 
 const envPad = ENV_PAD;
 const tokenInEnv = existsSync(envPad);
 console.log('');
 console.log(`tokenbestand: ${path.relative(process.cwd(), envPad) || envPad} — ${tokenInEnv ? 'gevonden' : 'ONTBREEKT'}`);
-if (!tokenInEnv) problemen.push(`geen .env op ${envPad}, dus de server start zonder token`);
+if (!tokenInEnv) problemen.push(`geen .env op ${envPad}, dus de servers starten zonder token`);
 
 console.log('');
 if (problemen.length) {

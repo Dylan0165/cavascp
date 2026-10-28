@@ -193,6 +193,17 @@ function renderLijst() {
         : 'OV onbekend';
     knop.append(chip(ovTekst, 'ov', bedrijf.ov ?? 'onbekend'));
 
+    // De treinreis, als de NS-koppeling er is. Zonder koppeling blijft hij weg
+    // in plaats van "onbekend" te zeggen: dat is een ander soort leegte.
+    if (bedrijf.reistijd?.minuten != null) {
+      const trein = chip(
+        `🚆 ${bedrijf.reistijd.minuten} min${bedrijf.reistijd.overstappen ? ` · ${bedrijf.reistijd.overstappen}× over` : ''}`,
+        'trein',
+        'ja',
+      );
+      knop.append(trein);
+    }
+
     const meta = document.createElement('span');
     meta.className = 'rij__meta';
     const stukken = [
@@ -255,6 +266,12 @@ function renderDetail() {
         ? 'OV-afstand onbekend'
         : b.ov;
   meta.append(ov);
+
+  if (b.reistijd?.minuten != null) {
+    const trein = document.createElement('span');
+    trein.textContent = `🚆 ${b.reistijd.van} → ${b.reistijd.naar}: ${b.reistijd.minuten} min, ${b.reistijd.overstappen} overstap${b.reistijd.overstappen === 1 ? '' : 'pen'}`;
+    meta.append(trein);
+  }
   if (b.emails?.length) {
     const mail = document.createElement('span');
     mail.textContent = b.emails.slice(0, 2).join(', ');

@@ -126,6 +126,21 @@ zonder herstart bij. Gebeurt dat niet, herstart DSH dan.
 | `assignment_detail` | Volledige details van één opdracht |
 | `canvas_whoami` | Gezondheidscheck van de koppeling |
 
+Daarnaast een tweede MCP-server voor het OV — `mcp-ns` in hetzelfde
+profielbestand:
+
+| Tool | Waarvoor |
+|---|---|
+| `ns_reisadvies` | van station naar station, met tijden en overstappen |
+| `ns_reistijd` | de snelste reistijd in één regel |
+| `ns_storingen` | wat er mis is, eventueel rond een station |
+| `ns_vertrektijden` | de volgende treinen vanaf een station |
+| `ns_stations` | stations zoeken |
+| `ns_status` | werkt de NS-koppeling? |
+
+Zie `docs/ov.md`. Zonder NS-sleutel werkt de rest gewoon; alleen de reistijden
+blijven dan leeg.
+
 ## Beveiliging
 
 Het dashboard draait lokaal, maar **localhost is op zichzelf geen beveiliging**:
@@ -316,6 +331,9 @@ node test-dashboard.mjs  # echte kliks via Chrome DevTools Protocol
 node test-documents.mjs  # document-inbox: upload, metadata, veiligheid
 node test-full-chain.mjs # bestand -> dashboard -> Portflow -> opruimen
 node shot-drawer.mjs     # screenshot van het detailpaneel
+
+cd ../mcp/ns
+node test-ns.mjs         # NS-client tegen een nepserver (19 checks)
 
 cd ../stagebot
 node test-stagebot.mjs   # tekst, e-mail, tech, mailopmaak (38 checks)
