@@ -271,6 +271,21 @@ export async function meldKanaal(kaart) {
     if (uitkomst.ok) return { kanaal: 'teams', ok: true };
   }
 
+  /*
+   * ntfy: push naar je telefoon, geen account en geen toestemming van wie dan
+   * ook. Staat vóór de mail, want een melding die je meteen ziet is meer waard
+   * dan een mail tussen de rest.
+   */
+  try {
+    const { ntfyBeschikbaar, verstuurPush } = await import('./ntfy.mjs');
+    if (ntfyBeschikbaar()) {
+      await verstuurPush({ titel: kaart?.Title, tekst: platteTekst(kaart) });
+      return { kanaal: 'ntfy', ok: true };
+    }
+  } catch (fout) {
+    console.warn(`  ntfy-melding mislukte: ${fout.message}`);
+  }
+
   try {
     const { gmailBeschikbaar, verstuurMail } = await import('./gmail.mjs');
     if (!gmailBeschikbaar()) return { kanaal: 'geen', ok: false };

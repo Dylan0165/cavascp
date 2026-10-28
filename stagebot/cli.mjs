@@ -22,6 +22,7 @@ import { isGeimporteerd } from '../ov/lib/planner.mjs';
 import { verstuurBedrijf, verstuurGoedgekeurd, kiesAdres } from './lib/versturen.mjs';
 import { vindGmailSleutels } from './lib/gmail.mjs';
 import { vindTeamsWebhook, bewaarTeamsWebhook, verstuurTeams, maakTeamsBericht } from './lib/teams.mjs';
+import { vindTopic, bewaarTopic, nieuwTopic, verstuurPush } from './lib/ntfy.mjs';
 import { readFileSync } from 'node:fs';
 
 const [, , commando, ...rest] = process.argv;
@@ -40,6 +41,7 @@ function gebruik() {
     node stagebot/cli.mjs ov --alles      reistijd voor alle bedrijven opnieuw
     node stagebot/cli.mjs gmail           is Gmail gekoppeld? (--test stuurt een proefmail)
     node stagebot/cli.mjs teams           is Teams gekoppeld? (--test, --zet <url>)
+    node stagebot/cli.mjs push            pushmeldingen naar je telefoon (ntfy)
     node stagebot/cli.mjs verstuur <id>   de mail van dat bedrijf echt versturen
     node stagebot/cli.mjs verstuur --alles alles wat goedgekeurd is
     node stagebot/cli.mjs voeg <url>      zelf een bedrijf toevoegen
@@ -240,6 +242,54 @@ async function main() {
         `\n  ${bedrijf.titel}: ${reistijd.van} → ${reistijd.naar} — ${reistijd.minuten} min, ` +
           `${reistijd.overstappen} overstap${reistijd.overstappen === 1 ? '' : 'pen'}\n`,
       );
+      return 0;
+    }
+
+    case 'push': {
+      if (rest.includes('--nieuw')) {
+        const topic = nieuwTopic();
+        bewaarTopic(topic);
+        console.log(`\n  Nieuw onderwerp: ${topic}`);
+        console.log(`  Meld je aan in de ntfy-app of open:`);
+        console.log(`    https://ntfy.sh/${topic}\n`);
+        return 0;
+      }
+
+      const zetIndex = rest.indexOf('--zet');
+      if (zetIndex !== -1) {
+        const topic = rest[zetIndex + 1];
+        if (!topic) {
+          console.log('  welk onderwerp? bijvoorbeeld: node stagebot/cli.mjs push --zet stagebot-dylan-abc123');
+          return 1;
+        }
+        try {
+          bewaarTopic(topic);
+          await verstuurPush({ titel: 'Stagebot is gekoppeld', tekst: 'Vanaf nu krijg je hier bericht.' });
+          console.log(`\n  Opgeslagen en getest. Open https://ntfy.sh/${topic}\n`);
+          return 0;
+        } catch (fout) {
+          console.log(`\n  Mislukt: ${fout.message}\n`);
+          return 1;
+        }
+      }
+
+      const gevonden = vindTopic();
+      if (!gevonden) {
+        console.log('\n  Nog geen push-onderwerp.');
+        console.log('  Maak er een met: node stagebot/cli.mjs push --nieuw\n');
+        return 1;
+      }
+
+      console.log(`\n  Onderwerp: ${gevonden.topic}`);
+      console.log(`  Bekijken: https://ntfy.sh/${gevonden.topic}`);
+
+      if (rest.includes('--test')) {
+        await verstuurPush({ titel: 'Proefmelding', tekst: 'Als je dit ziet, werkt de push.' });
+        console.log('  Proefmelding verstuurd.\n');
+        return 0;
+      }
+
+      console.log('');
       return 0;
     }
 

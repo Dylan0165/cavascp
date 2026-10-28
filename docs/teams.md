@@ -69,11 +69,27 @@ Dezelfde blokkade geldt voor de algemene HTTP-trigger in combinatie met de
 Teams-connector. En het lezen van documenten uit Teams (Microsoft Graph) vraagt
 bovendien toestemming van een beheerder — die route is om dezelfde reden dicht.
 
-Wat dan wél werkt:
+Wat dan wél werkt — en wat de stagebot automatisch pakt:
 
-- **meldingen per mail** naar jezelf (de stagebot doet dat automatisch als
-  Teams niet gekoppeld is);
-- een andere pushdienst die niets met Microsoft te maken heeft, zoals ntfy.
+| Kanaal | Instellen | Waar het aankomt |
+|---|---|---|
+| **ntfy** (push) | `node stagebot/cli.mjs push --nieuw` | ntfy-app op je telefoon, of <https://ntfy.sh/<onderwerp>> in de browser |
+| **mail** | je Gmail-koppeling | je inbox |
+
+De volgorde is: Teams-webhook → ntfy → mail. Het eerste dat werkt, krijgt de
+melding. Zo krijg je altijd bericht, ook al is er niets van Microsoft
+toegestaan.
+
+### ntfy in twee stappen
+
+```bash
+node stagebot/cli.mjs push --nieuw      # maakt een geheim onderwerp
+node stagebot/cli.mjs push --test       # stuurt een proefmelding
+```
+
+Installeer de **ntfy**-app (Android/iOS) en meld je aan op het onderwerp dat je
+kreeg. Geen account, geen wachtwoord. Het onderwerp is willekeurig en werkt als
+geheim: wie het niet weet, ziet niets.
 
 Wil je het toch via Teams, dan moet de Fontys-beheerder het beleid aanpassen.
 Vraag dan om `TeamsWebhookRequestReceived` toe te staan in het standaard
