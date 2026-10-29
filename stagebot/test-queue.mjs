@@ -204,20 +204,24 @@ check('de bedrijfsnaam blijft als de site een slogan als titel heeft', () => {
   assert.equal(bedrijf.titel, 'Daemen ICT');
 });
 
-check('een titel die alleen het domein is, wordt vervangen', () => {
-  const bedrijf = voegUrlToe('https://zomaar.test');
-  assert.equal(bedrijf.titel, 'zomaar');
-  const { bedrijf: na } = voegToe({
-    url: 'https://zomaar.test',
-    domein: 'zomaar.test',
-    titel: 'Zomaar Software',
-    emails: [],
-    tekst: 'x',
-    paginas: [],
-    gescand: new Date().toISOString(),
+// Deze twee zijn async (ze toetsen het domein), dus geen check() eromheen:
+// een async testbody zou stilletjes slagen zonder de assertie te halen.
+{
+  const bedrijf = await voegUrlToe('https://zomaar.test', { controleerDomein: false });
+  check('een titel die alleen het domein is, wordt vervangen', () => {
+    assert.equal(bedrijf.titel, 'zomaar');
+    const { bedrijf: na } = voegToe({
+      url: 'https://zomaar.test',
+      domein: 'zomaar.test',
+      titel: 'Zomaar Software',
+      emails: [],
+      tekst: 'x',
+      paginas: [],
+      gescand: new Date().toISOString(),
+    });
+    assert.equal(na.titel, 'Zomaar Software');
   });
-  assert.equal(na.titel, 'Zomaar Software');
-});
+}
 
 console.log('\n6) Eigen lijst');
 
@@ -226,11 +230,13 @@ check('de seedlijst is leesbaar', () => {
   assert.ok(Array.isArray(seed));
 });
 
-check('een url zonder protocol wordt aangevuld', () => {
-  const bedrijf = voegUrlToe('www.nogiets.test');
-  assert.equal(bedrijf.url, 'https://www.nogiets.test');
-  assert.equal(bedrijf.domein, 'nogiets.test');
-});
+{
+  const bedrijf = await voegUrlToe('www.nogiets.test', { controleerDomein: false });
+  check('een url zonder protocol wordt aangevuld', () => {
+    assert.equal(bedrijf.url, 'https://www.nogiets.test');
+    assert.equal(bedrijf.domein, 'nogiets.test');
+  });
+}
 
 console.log('\n7) De mailcontrole');
 

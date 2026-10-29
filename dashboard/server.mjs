@@ -1392,7 +1392,7 @@ const server = createServer(async (req, res) => {
     if (pathname === '/api/stage/voeg' && req.method === 'POST') {
       const body = await readBody(req);
       try {
-        const bedrijf = voegUrlToe(String(body.url ?? ''));
+        const bedrijf = await voegUrlToe(String(body.url ?? ''));
         return sendJson(res, 201, { bedrijf: stageLicht(bedrijf), overzicht: stageOverzicht() });
       } catch (fout) {
         return sendJson(res, 400, { error: fout.message });

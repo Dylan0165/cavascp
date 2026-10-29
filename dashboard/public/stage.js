@@ -724,6 +724,23 @@ async function dagrun() {
 
   let gedaan = 0;
   let mislukt = 0;
+  const problemen = [];
+
+  /*
+   * Zonder aanvoer valt er niets te doen. In plaats van "geen kandidaten" te
+   * zeggen halen we eerst de eigen lijst op — dat is één verzoek en het scheelt
+   * de gebruiker een stap.
+   */
+  if (!(state.overzicht?.wachtrij ?? []).length) {
+    voortgang('Geen wachtrij — eigen lijst ophalen…');
+    try {
+      const { overzicht } = await api('/api/stage/zoek', { body: { bron: 'eigen' } });
+      state.overzicht = overzicht;
+      renderAlles();
+    } catch {
+      /* dan loopt de run hieronder gewoon tegen een lege wachtrij aan */
+    }
+  }
   /*
    * Een bedrijf waarvan de site niet te lezen is, blijft in de wachtrij staan —
    * dat is goed, want morgen lukt het misschien wel. Binnen deze run slaan we
@@ -751,6 +768,7 @@ async function dagrun() {
       } catch (fout) {
         mislukt += 1;
         // Doorslikken zou betekenen dat je denkt dat er twintig klaarstaan.
+        problemen.push(`${volgende.titel}: ${fout.message.replace(/^.*?niet lezen \(/, '').replace(/\).*$/, '')}`);
         melding(`${volgende.titel} overgeslagen: ${fout.message}`, 'fout');
       }
     }
@@ -760,14 +778,21 @@ async function dagrun() {
     renderAlles();
   }
 
-  melding(
-    gedaan
-      ? `${gedaan} mail${gedaan === 1 ? '' : 's'} klaargezet${mislukt ? `, ${mislukt} overgeslagen` : ''}. Lees ze na bij “Te beoordelen”.`
-      : mislukt
-        ? `Alle ${mislukt} kandidaten mislukten — zie de melding hierboven.`
-        : 'Geen kandidaten in de wachtrij.',
-    gedaan ? 'info' : 'fout',
-  );
+  if (gedaan) {
+    melding(
+      `${gedaan} mail${gedaan === 1 ? '' : 's'} klaargezet${mislukt ? `, ${mislukt} overgeslagen` : ''}. Lees ze na bij “Te beoordelen”.`,
+    );
+  } else if (mislukt) {
+    melding(
+      `Alle ${mislukt} kandidaten mislukten — ${problemen.join(' · ')}. Na twee pogingen gaat een bedrijf naar “onbereikbaar”.`,
+      'fout',
+    );
+  } else {
+    melding(
+      'Geen kandidaten in de wachtrij. Haal eerst aanvoer op met “Eigen lijst” of “OpenStreetMap”, of plak een adres.',
+      'info',
+    );
+  }
 }
 
 async function zoek(bron) {

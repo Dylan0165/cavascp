@@ -13,6 +13,7 @@
  */
 
 import { existsSync, readFileSync } from 'node:fs';
+import { lookup } from 'node:dns/promises';
 import { inData } from '../../mcp/lib/paden.mjs';
 import { overpass, bruikbareElementen, leesCache, bewaarCache } from './osm.mjs';
 import { THUIS, STRAAL_KM, laadStations, beoordeelLocatie, inRegio, OV_RANG } from './regio.mjs';
@@ -22,13 +23,33 @@ import { normaliseerUrl, domeinVan } from './scan.mjs';
 const CACHE_NAAM = 'bedrijven';
 
 /** Wat voor bedrijven we zoeken. ICT en alles wat daar direct aan raakt. */
-const ZOEKTERMEN = [
-  ['office', 'it'],
-  ['office', 'software'],
-  ['office', 'telecommunication'],
-  ['shop', 'computer'],
-  ['craft', 'electronics'],
-];
+/*
+ * Twee soorten tags.
+ *
+ * De eerste groep is per definitie ICT: die nemen we altijd mee. De tweede
+ * groep is "een bedrijf" in het algemeen — daar zit van alles tussen, van een
+ * installateur tot een bakkerij. Die nemen we alleen mee als de naam of het
+ * domein naar ICT wijst, anders staat je wachtrij binnen een minuut vol met
+ * bedrijven waar je geen stage in de ICT kunt doen.
+ */
+const ZOEKTERMEN = {
+  ict: [
+    ['office', 'it'],
+    ['office', 'software'],
+    ['office', 'telecommunication'],
+    ['shop', 'computer'],
+    ['craft', 'electronics'],
+  ],
+  algemeen: [
+    ['office', 'company'],
+    ['office', 'consulting'],
+    ['office', 'engineer'],
+  ],
+};
+
+/** Woorden die op een ICT-bedrijf wijzen. */
+const ICT_WOORDEN =
+  /(^|[^a-z])(ict|it|software|data|digital|web|cloud|security|cyber|netwerk|netwerken|automatisering|hosting|internet|applicatie|applicaties|developer|programmeur|systeembeheer|systeem|ai)([^a-z]|$)/i;
 
 /**
  * Sites die geen bedrijfssite zijn.
@@ -73,18 +94,36 @@ export async function zoekBedrijven({ straalKm = STRAAL_KM, force = false } = {}
   }
 
   const rond = `(around:${Math.round(straalKm * 1000)},${THUIS.lat},${THUIS.lon})`;
-  const query = `[out:json][timeout:180];
-(
-${ZOEKTERMEN.map(([k, v]) => `  nwr["${k}"="${v}"]${rond};`).join('\n')}
-  nwr["office"="company"]["industry"~"software|internet|it",i]${rond};
-);
-out center tags;`;
 
-  const data = await overpass(query);
+  /*
+   * Eén query per tag, niet één grote. De publieke Overpass-server geeft bij
+   * een brede query regelmatig een 504; losse queries van één regel komen er
+   * wel door. Het duurt langer, maar het werkt.
+   */
+  const elementen = [];
+  for (const [soort, termen] of Object.entries(ZOEKTERMEN)) {
+    for (const [sleutel, waarde] of termen) {
+      const query = `[out:json][timeout:60];nwr["${sleutel}"="${waarde}"]["website"]${rond};out center tags;`;
+      try {
+        const data = await overpass(query, { timeoutMs: 90_000 });
+        for (const element of bruikbareElementen(data)) {
+          if (soort === 'algemeen') {
+            const naam = `${element.tags.name ?? ''} ${element.tags.website ?? ''}`;
+            if (!ICT_WOORDEN.test(naam)) continue;
+          }
+          elementen.push(element);
+        }
+      } catch (fout) {
+        // Eén tag die niet langskomt mag de rest niet tegenhouden.
+        console.warn(`  (${sleutel}=${waarde} overgeslagen: ${fout.message})`);
+      }
+    }
+  }
+
   const stations = await laadStations().catch(() => []);
-
   const perDomein = new Map();
-  for (const el of bruikbareElementen(data)) {
+
+  for (const el of elementen) {
     const naam = tekstVanElement(el);
     const website = websiteVan(el.tags);
     if (!naam || !website) continue;
@@ -115,7 +154,19 @@ out center tags;`;
     });
   }
 
-  const kandidaten = [...perDomein.values()].sort(
+  const gevonden = [...perDomein.values()];
+
+  /*
+   * OpenStreetMap bevat adressen die allang weg zijn. Die kosten elke dagrun
+   * twintig seconden en leveren nooit iets op, dus filteren we ze er nu al uit
+   * — op DNS, niet op de pagina (een 403 betekent "bot geweigerd", niet "weg").
+   */
+  const bestaand = [];
+  for (const kandidaat of gevonden) {
+    if (await bestaatDomein(kandidaat.domein)) bestaand.push(kandidaat);
+  }
+
+  const kandidaten = bestaand.sort(
     (a, b) => (OV_RANG[a.ov] ?? 3) - (OV_RANG[b.ov] ?? 3) || (a.vanHuisKm ?? 99) - (b.vanHuisKm ?? 99),
   );
 
@@ -161,6 +212,33 @@ export function voegKandidatenToe(kandidaten) {
   }
 
   return { nieuw, overgeslagen };
+}
+
+/* ────────────────────────── bestaat die site? ──────────────────────────── */
+
+/**
+ * Kijkt of een domein bestaat, vóór het in de wachtrij komt.
+ *
+ * OpenStreetMap bevat adressen die allang weg zijn, en een handmatig geplakt
+ * adres kan een typfout zijn. Zo'n bedrijf kost elke dagrun twintig seconden en
+ * levert nooit iets op. Een DNS-lookup kost milliseconden en vangt het meeste.
+ */
+export async function bestaatDomein(domein) {
+  try {
+    await lookup(domein);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/** Filtert kandidaten op een bestaand domein. */
+export async function filterBereikbaar(kandidaten) {
+  const uit = [];
+  for (const kandidaat of kandidaten) {
+    if (await bestaatDomein(kandidaat.domein)) uit.push(kandidaat);
+  }
+  return uit;
 }
 
 /* ───────────────────────── handmatige aanvoer ──────────────────────────── */
@@ -210,10 +288,13 @@ export function seedKandidaten() {
  * Dit is de route voor alles wat niet in OSM staat: een vacature op LinkedIn,
  * een bedrijf dat je kent, een tip van iemand.
  */
-export function voegUrlToe(url) {
+export async function voegUrlToe(url, { controleerDomein = true } = {}) {
   const website = normaliseerUrl(url);
   const domein = domeinVan(website);
   if (!domein) throw new Error(`Geen bruikbaar adres: ${url}`);
+  if (controleerDomein && !(await bestaatDomein(domein))) {
+    throw new Error(`Dat domein bestaat niet (${domein}). Controleer het adres.`);
+  }
 
   const titel = domein.replace(/^www\./, '').split('.')[0];
   return voegKandidaatToe({

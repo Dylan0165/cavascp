@@ -30,10 +30,19 @@ export async function leesEnSchrijf(bedrijfId, { dag = vandaag() } = {}) {
     scan = await scanBedrijf(bestaand.url);
   } catch (fout) {
     werkBij(bestaand.id, (b) => {
+      const mislukkingen = (b.mislukkingen ?? 0) + 1;
+      b.mislukkingen = mislukkingen;
       b.notities = [
         ...(b.notities ?? []),
         { op: new Date().toISOString(), tekst: `lezen mislukt: ${fout.message}` },
       ];
+
+      /*
+       * Twee keer geprobeerd en nog steeds niets: dan is het geen pech maar een
+       * dode site. Uit de wachtrij halen, anders probeert elke dagrun dezelfde
+       * vier kapotte adressen opnieuw en blijft de teller op nul staan.
+       */
+      if (mislukkingen >= 2) b.status = 'onbereikbaar';
     });
     throw fout;
   }

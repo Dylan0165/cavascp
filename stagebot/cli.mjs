@@ -125,7 +125,7 @@ async function main() {
         console.log('  welke site? bijvoorbeeld: node stagebot/cli.mjs voeg daemen-ict.nl');
         return 1;
       }
-      const bedrijf = voegUrlToe(url);
+      const bedrijf = await voegUrlToe(url);
       console.log(`\n  toegevoegd: ${bedrijf.titel} (${bedrijf.domein})\n`);
       return 0;
     }

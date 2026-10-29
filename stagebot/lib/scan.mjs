@@ -42,8 +42,10 @@ const EXTRA_PADEN = [
  */
 async function haalHtml(url, { pogingen = 2 } = {}) {
   let laatste = 'onbekende fout';
+  let poging = 0;
 
-  for (let poging = 1; poging <= pogingen; poging += 1) {
+  while (poging < pogingen) {
+    poging += 1;
     try {
       const antwoord = await fetch(url, {
         headers: { 'User-Agent': USER_AGENT, Accept: 'text/html,application/xhtml+xml' },
@@ -53,13 +55,18 @@ async function haalHtml(url, { pogingen = 2 } = {}) {
 
       if (!antwoord.ok) {
         laatste = `HTTP ${antwoord.status}`;
-        continue;
+        /*
+         * Een 403 of 500 wordt niet beter van een tweede poging. Alleen bij een
+         * time-out of een netwerkfout is het zinvol om het nog eens te proberen
+         * — dat scheelt bij dode sites twintig seconden per bedrijf.
+         */
+        break;
       }
 
       const type = antwoord.headers.get('content-type') || '';
       if (!type.includes('html')) {
         laatste = `geen HTML maar ${type.split(';')[0] || 'onbekend type'}`;
-        continue;
+        break;
       }
 
       const html = await antwoord.text();
@@ -69,6 +76,9 @@ async function haalHtml(url, { pogingen = 2 } = {}) {
         fout.name === 'TimeoutError'
           ? 'geen antwoord binnen 20 seconden'
           : (fout.cause?.code ?? fout.message);
+
+      // Een domein dat niet bestaat wordt ook niet beter van een tweede poging.
+      if (/ENOTFOUND|EAI_AGAIN/.test(String(laatste))) break;
     }
   }
 

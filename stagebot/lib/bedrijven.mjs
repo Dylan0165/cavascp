@@ -29,6 +29,7 @@ export const STATUS = {
   geantwoord: 'ze hebben terug gemaild',
   afgewezen: 'nee, of geen stageplek',
   gesprek: 'in gesprek',
+  onbereikbaar: 'site werkt niet — twee keer geprobeerd',
   klaar: 'stage gevonden',
 };
 

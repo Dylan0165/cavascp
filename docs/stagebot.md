@@ -75,6 +75,19 @@ je mailadres kunt permitteren: als je elke dag twintig koude mails stuurt vanaf
 je gmail, staat dat adres binnen twee weken als spam bekend, en dan komt je
 eigen stage-aanvraag niet meer aan.
 
+## Wat er niet in de wachtrij komt
+
+Drie filters, alle drie uit ervaring:
+
+| Filter | Waarom |
+|---|---|
+| **Domein bestaat niet** (DNS) | Een dode site kost elke run twintig seconden en levert nooit iets op. Bij het toevoegen al gecontroleerd. |
+| **Geen ICT-signaal** | `office=company` in OSM is óók de bakker en de installateur. Alleen meegenomen als de naam of het domein naar ICT wijst. |
+| **Twee keer niet te lezen** | Daarna gaat het bedrijf naar `onbereikbaar` en uit de wachtrij. |
+
+Zonder die filters stond de wachtrij na één zoekopdracht op 171 bedrijven waar
+je geen stage in de ICT kunt doen — dat is precies wat er één keer gebeurde.
+
 ## Waar de bedrijven vandaan komen
 
 Drie bronnen, in volgorde van betrouwbaarheid:

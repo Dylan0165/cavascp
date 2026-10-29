@@ -216,17 +216,30 @@ export function keurMail(mail, profiel = leesProfiel()) {
 
   /*
    * Een opt-out is verplicht voor zakelijke e-mail. We kijken naar de strekking
-   * en niet naar één vaste zin, want het model formuleert het elke keer anders:
-   * "een nee is ook goed", "een nee is ook prima", "laat het vooral weten als",
-   * "dan hoor ik het graag".
+   * en niet naar één vaste zin, want het model formuleert hem elke keer anders:
    *
-   * "prima" en "best" moeten er expliciet bij: het model koos in de praktijk
-   * voor "Een nee is ook prima" en dat werd eerder als ontbrekende opt-out
-   * gemeld — een controle die een goede mail afkeurt, leer je negeren.
+   *   "Een nee is ook goed."
+   *   "Een nee is ook prima; dan weet ik dat ik verder kan kijken."
+   *   "Als een stage niet mogelijk is, hoor ik dat ook graag."
+   *   "Laat het vooral weten als jullie geen plek hebben."
+   *
+   * Eén vaste regex werd hier een lijst met uitzonderingen. Daarom een paar
+   * patronen naast elkaar: elk dekt een familie formuleringen.
    */
-  const optOut =
-    /(nee is [^.;\n]{0,20}(goed|prima|best|fijn)|geen interesse|niet ge[ïi]nteresseerd|laat het (vooral |gerust |even )?weten|dan hoor ik het graag|als (dit|deze|jullie) (niets|geen)|hoeft u (niet|geen)|dank is ook goed)/i;
-  if (!optOut.test(`${body}\n${mail.volledig}`)) {
+  const optUitPatronen = [
+    /nee is [^.;\n]{0,30}(goed|prima|best|fijn)/i,
+    /nee is [^.;\n]{0,30}(geen probleem|prima)/i,
+    /(geen interesse|niet ge[ïi]nteresseerd)/i,
+    /laat het (vooral |gerust |even )?weten/i,
+    /hoor ik (dat |het )?(ook )?graag/i,
+    /als (dit|deze|het|de stage|een stage|jullie|stage) [^.;\n]{0,40}(niet|geen)/i,
+    /hoeft u (niet|geen)/i,
+    /dank is ook goed/i,
+    /geen probleem (als|mocht)/i,
+  ];
+  const optOut = optUitPatronen.some((patroon) => patroon.test(`${body}\n${mail.volledig}`));
+
+  if (!optOut) {
     punten.push('geen regel waarin ze kunnen afwijzen — dat is verplicht bij zakelijke e-mail');
   }
 
