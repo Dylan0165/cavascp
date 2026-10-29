@@ -49,6 +49,8 @@ import { zoekBedrijven, voegKandidatenToe, seedKandidaten, voegUrlToe } from '..
 import { leesEnSchrijf } from '../stagebot/lib/pijplijn.mjs';
 import { keurMail } from '../stagebot/lib/mail.mjs';
 import { haalAntwoorden } from '../stagebot/lib/inbox.mjs';
+import { opTeVolgen, verstuurOpvolging } from '../stagebot/lib/opvolgen.mjs';
+import { dagbriefing } from '../stagebot/lib/briefing.mjs';
 import { verstuurBedrijf, verstuurGoedgekeurd, kiesAdres } from '../stagebot/lib/versturen.mjs';
 import { gmailBeschikbaar, vindGmailSleutels, bewaarGmailSleutels, verwijderGmailSleutels, controleerGmailLogin } from '../stagebot/lib/gmail.mjs';
 import { leesProfiel } from '../stagebot/lib/profiel.mjs';
@@ -606,6 +608,15 @@ function stageOverzicht() {
     vandaag: alle.filter((b) => b.dag === telling.dag).map(stageLicht),
     teBeoordelen: alle.filter((b) => b.status === 'concept').map(stageLicht),
     teVersturen: alle.filter((b) => b.status === 'goedgekeurd').map(stageLicht),
+    // De opvolg-lijst is een lijstje ids met dagen erbij; voor het scherm
+    // hebben we dezelfde vorm nodig als de andere rijen.
+    opvolgen: opTeVolgen()
+      .map((item) => {
+        const bedrijf = zoekBedrijf(item.id);
+        return bedrijf ? { ...stageLicht(bedrijf), ...item } : null;
+      })
+      .filter(Boolean),
+    briefing: dagbriefing(),
     verstuurd: alle
       .filter((b) => ['verstuurd', 'geantwoord', 'gesprek', 'klaar'].includes(b.status))
       .map(stageLicht),
@@ -1347,6 +1358,7 @@ const server = createServer(async (req, res) => {
         mail: bedrijf.mail ?? null,
         notities: bedrijf.notities ?? [],
         antwoorden: bedrijf.antwoorden ?? [],
+        opvolgingen: bedrijf.opvolgingen ?? [],
         laatsteAntwoord: bedrijf.laatsteAntwoord ?? null,
       });
     }
@@ -1447,6 +1459,19 @@ const server = createServer(async (req, res) => {
      * Antwoorden lezen uit Gmail. Duurt een paar seconden (IMAP), dus achter
      * een eigen rem. Alleen-lezen: er wordt niets in je mailbox veranderd.
      */
+    if (pathname === '/api/stage/opvolgen' && req.method === 'POST') {
+      if (!security.rateLimitOk({ emmer: 'mail', limiet: 20 })) {
+        return sendJson(res, 429, { error: 'Te veel mails binnen een minuut. Even wachten.' });
+      }
+      const body = await readBody(req);
+      try {
+        const { opvolging, naar } = await verstuurOpvolging(String(body.id ?? ''));
+        return sendJson(res, 200, { opvolging, naar, overzicht: stageOverzicht() });
+      } catch (fout) {
+        return sendJson(res, 502, { error: fout.message, overzicht: stageOverzicht() });
+      }
+    }
+
     if (pathname === '/api/stage/inbox' && req.method === 'POST') {
       if (!security.rateLimitOk({ emmer: 'mail', limiet: 20 })) {
         return sendJson(res, 429, { error: 'Te veel pogingen. Even wachten.' });

@@ -338,6 +338,7 @@ cd ../stagebot
 node test-stagebot.mjs   # tekst, e-mail, tech, mailopmaak (38 checks)
 node test-teams.mjs      # URL-controle en de kaart, tegen een nepserver (20 checks)
 node test-inbox.mjs      # antwoorden herkennen en koppelen (17 checks)
+node test-opvolgen.mjs   # wie volg je op, en wanneer stop je (16 checks)
 node test-queue.mjs      # afstand, OV, wachtrij, daglimiet (23 checks)
 node test-smtp.mjs       # het mailgesprek, tegen een nepserver (11 checks)
 

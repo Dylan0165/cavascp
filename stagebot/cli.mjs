@@ -24,6 +24,8 @@ import { vindGmailSleutels } from './lib/gmail.mjs';
 import { vindTeamsWebhook, bewaarTeamsWebhook, verstuurTeams, maakTeamsBericht } from './lib/teams.mjs';
 import { vindTopic, bewaarTopic, nieuwTopic, verstuurPush } from './lib/ntfy.mjs';
 import { haalAntwoorden } from './lib/inbox.mjs';
+import { opTeVolgen, verstuurOpvolging } from './lib/opvolgen.mjs';
+import { dagbriefing, briefingTekst } from './lib/briefing.mjs';
 import { readFileSync } from 'node:fs';
 
 const [, , commando, ...rest] = process.argv;
@@ -42,6 +44,8 @@ function gebruik() {
     node stagebot/cli.mjs ov --alles      reistijd voor alle bedrijven opnieuw
     node stagebot/cli.mjs gmail           is Gmail gekoppeld? (--test stuurt een proefmail)
     node stagebot/cli.mjs teams           is Teams gekoppeld? (--test, --zet <url>)
+    node stagebot/cli.mjs briefing        wat vraagt vandaag aandacht (--push)
+    node stagebot/cli.mjs opvolgen        wie moet ik opvolgen (of: opvolgen <id>)
     node stagebot/cli.mjs inbox           antwoorden lezen uit je Gmail
     node stagebot/cli.mjs push            pushmeldingen naar je telefoon (ntfy)
     node stagebot/cli.mjs verstuur <id>   de mail van dat bedrijf echt versturen
@@ -244,6 +248,45 @@ async function main() {
         `\n  ${bedrijf.titel}: ${reistijd.van} → ${reistijd.naar} — ${reistijd.minuten} min, ` +
           `${reistijd.overstappen} overstap${reistijd.overstappen === 1 ? '' : 'pen'}\n`,
       );
+      return 0;
+    }
+
+    case 'briefing': {
+      const briefing = dagbriefing();
+      console.log(`\n${briefingTekst(briefing).split('\n').map((r) => '  ' + r).join('\n')}\n`);
+      if (rest.includes('--push')) {
+        await verstuurPush({ titel: 'Dagbriefing', tekst: briefingTekst(briefing) });
+        console.log('  Als push verstuurd.\n');
+      }
+      return 0;
+    }
+
+    case 'opvolgen': {
+      const id = rest.find((r) => !r.startsWith('--'));
+
+      if (!id) {
+        const lijst = opTeVolgen();
+        if (!lijst.length) {
+          console.log('\n  Niemand om op te volgen.\n');
+          return 0;
+        }
+        console.log(`\n  ${lijst.length} om op te volgen:`);
+        for (const item of lijst) {
+          console.log(
+            `     ${item.dagenGeleden} dagen · ${String(item.titel).slice(0, 28).padEnd(30)} ${item.naar ?? 'geen adres'}` +
+              `${item.keer ? ` (${item.keer}× eerder)` : ''}`,
+          );
+        }
+        console.log('\n  Versturen: node stagebot/cli.mjs opvolgen <id>\n');
+        return 0;
+      }
+
+      console.log(`\n  Opvolging schrijven voor ${id}…`);
+      const { naar, opvolging } = await verstuurOpvolging(id);
+      console.log(`  Verstuurd naar ${naar}`);
+      console.log(`\n  ${opvolging.onderwerp}\n`);
+      for (const regel of opvolging.volledig.split('\n')) console.log(`  ${regel}`);
+      console.log('');
       return 0;
     }
 

@@ -151,6 +151,7 @@ function lijstVoorWeergave() {
   const o = state.overzicht;
   if (!o) return [];
   if (state.view === 'beoordelen') return o.teBeoordelen ?? [];
+  if (state.view === 'opvolgen') return o.opvolgen ?? [];
   if (state.view === 'wachtrij') return o.wachtrij ?? [];
   if (state.view === 'verstuurd') return o.verstuurd ?? [];
   return o.vandaag ?? [];
@@ -167,7 +168,9 @@ function renderLijst() {
     leeg.textContent =
       state.view === 'wachtrij'
         ? 'Geen wachtrij. Gebruik “Eigen lijst” of “OpenStreetMap”, of plak een adres.'
-        : 'Nog niets in deze weergave.';
+        : state.view === 'opvolgen'
+          ? 'Niemand om op te volgen. Na zes dagen zonder antwoord verschijnt een bedrijf hier.'
+          : 'Nog niets in deze weergave.';
     host.append(leeg);
     return;
   }
@@ -214,6 +217,8 @@ function renderLijst() {
     const meta = document.createElement('span');
     meta.className = 'rij__meta';
     const stukken = [
+      bedrijf.dagenGeleden != null ? `${bedrijf.dagenGeleden} dagen geleden` : null,
+      bedrijf.keer ? `${bedrijf.keer}× opgevolgd` : null,
       bedrijf.plaats,
       bedrijf.vanHuisKm != null ? `${schat}${bedrijf.vanHuisKm} km van huis` : null,
       bedrijf.heeftMail ? '✉ mail' : null,
@@ -322,6 +327,31 @@ function renderDetail() {
     }
     host.append(oordeel);
 
+    if (b.opvolgingen?.length) {
+      const blok = document.createElement('div');
+      blok.className = 'antwoorden';
+      const kop = document.createElement('p');
+      kop.className = 'antwoorden__kop';
+      kop.textContent = `${b.opvolgingen.length}× opgevolgd`;
+      blok.append(kop);
+
+      for (const opvolging of [...b.opvolgingen].reverse()) {
+        const regel = document.createElement('div');
+        regel.className = 'antwoord';
+        const titel = document.createElement('p');
+        titel.className = 'antwoord__titel';
+        titel.textContent = opvolging.onderwerp;
+        regel.append(titel);
+        const meta = document.createElement('p');
+        meta.className = 'antwoord__meta';
+        meta.textContent = `verstuurd ${new Date(opvolging.op).toLocaleString('nl-NL')}`;
+        regel.append(meta);
+        blok.append(regel);
+      }
+
+      host.append(blok);
+    }
+
     if (b.antwoorden?.length) {
       const blok = document.createElement('div');
       blok.className = 'antwoorden';
@@ -392,6 +422,15 @@ function renderDetail() {
       knop('Lees en schrijf', () => scanEen(b.id), 'btn'),
     );
   } else {
+    const kanOpvolgen =
+      b.status === 'verstuurd' && !(b.antwoorden ?? []).length && (b.opvolgingen ?? []).length < 2;
+
+    if (kanOpvolgen) {
+      const opvolgKnop = knop('Stuur opvolging', () => stuurOpvolging(b.id), 'btn');
+      opvolgKnop.disabled = !state.overzicht?.gmail?.gekoppeld;
+      acties.prepend(opvolgKnop);
+    }
+
     const kanVersturen = ['concept', 'goedgekeurd'].includes(b.status) && (b.emails ?? []).length > 0;
     const verstuurKnop = knop(
       b.status === 'verstuurd' ? 'Al verstuurd' : `Verstuur naar ${b.emails?.[0] ?? '—'}`,
@@ -586,6 +625,27 @@ async function verstuur(b) {
     renderKop();
     renderLijst();
     melding(`Verstuurd naar ${verzonden}.`);
+  } catch (fout) {
+    melding(fout.message, 'fout');
+  } finally {
+    state.bezig = false;
+    voortgang('');
+  }
+}
+
+async function stuurOpvolging(id) {
+  if (state.bezig) return;
+  if (!window.confirm('Opvolging versturen naar dit bedrijf?')) return;
+
+  state.bezig = true;
+  voortgang('Opvolging schrijven…');
+  try {
+    const { overzicht, naar } = await api('/api/stage/opvolgen', { body: { id } });
+    state.overzicht = overzicht;
+    await selecteer(id);
+    renderKop();
+    renderLijst();
+    melding(`Opvolging verstuurd naar ${naar}.`);
   } catch (fout) {
     melding(fout.message, 'fout');
   } finally {
