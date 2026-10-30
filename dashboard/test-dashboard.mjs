@@ -12,11 +12,12 @@
  */
 
 import { spawn } from 'node:child_process';
-import { mkdtempSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 
 const PORT = process.env.CAVASCP_PORT || 8787;
+const TEST_WACHTWOORD = process.env.CAVASCP_TEST_WACHTWOORD || 'Test-wachtwoord-123';
 const ORIGIN = `http://127.0.0.1:${PORT}`;
 const DEBUG_PORT = 9333;
 const CHROME =
@@ -102,10 +103,29 @@ async function main() {
    * Node bewaart cookies niet vanzelf zoals een browser, dus we pakken de
    * sessiecookie expliciet uit de bootstrappagina.
    */
-  const boot = await fetch(`${ORIGIN}/`);
-  const setCookie = boot.headers.get('set-cookie') ?? '';
+  /*
+   * De cookie komt nu van het inloggen, niet meer van de startpagina. Op een
+   * verse server bestaat er nog geen wachtwoord, dus stellen we het hier in
+   * (of loggen we in als het al bestaat).
+   */
+  const login = await fetch(`${ORIGIN}/api/auth/login`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Origin: ORIGIN },
+    body: JSON.stringify({ wachtwoord: TEST_WACHTWOORD }),
+  });
+
+  let setCookie = login.headers.get('set-cookie') ?? '';
+  if (!setCookie) {
+    const setup = await fetch(`${ORIGIN}/api/auth/setup`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Origin: ORIGIN },
+      body: JSON.stringify({ wachtwoord: TEST_WACHTWOORD }),
+    });
+    setCookie = setup.headers.get('set-cookie') ?? '';
+  }
+
   const cookie = setCookie.match(/cavascp_session=[^;]+/)?.[0];
-  if (!cookie) throw new Error('geen sessiecookie van de bootstrappagina');
+  if (!cookie) throw new Error('geen sessiecookie na inloggen');
 
   const reset = await fetch(`${ORIGIN}/api/state`, {
     method: 'PUT',
@@ -142,9 +162,27 @@ async function main() {
 
   await send('Runtime.enable');
   await send('Page.enable');
-  // Via de bootstrappagina: die zet de sessiecookie en stuurt door naar het
-  // dashboard. Direct naar /dashboard gaan geeft een 401.
+
+  /*
+   * Sinds er een wachtwoord op het dashboard zit, stuurt / door naar /login.
+   * Deze test zet dat wachtwoord zelf (op een verse instantie) en logt in;
+   * draai hem dus tegen een eigen server, niet tegen de echte.
+   */
+  const wachtwoord = TEST_WACHTWOORD;
   await send('Page.navigate', { url: `${ORIGIN}/` });
+  await sleep(1200);
+
+  if (await evaluate(`location.pathname === '/login'`)) {
+    await evaluate(`(() => {
+      const w = document.getElementById('wachtwoord');
+      const h = document.getElementById('herhaal');
+      if (w) w.value = ${JSON.stringify(wachtwoord)};
+      if (h) h.value = ${JSON.stringify(wachtwoord)};
+      document.getElementById('vorm')?.dispatchEvent(new Event('submit', { cancelable: true }));
+      return true;
+    })()`);
+    await sleep(2500);
+  }
 
   // Wait for the app to finish its first data load.
   let ready = false;
@@ -176,7 +214,15 @@ async function main() {
   );
   await sleep(400);
   const after = await evaluate(`document.querySelectorAll('.item').length`);
-  check('filter "verlopen" verandert de lijst', after !== before, `${before} -> ${after}`);
+  const filterAan = await evaluate(
+    `document.querySelector('.seg__btn[data-when="overdue"]').classList.contains('is-on')`,
+  );
+  /*
+   * Niet toetsen op "er verandert iets": staan alle items van dit semester al
+   * op verlopen, dan blijft de lijst even lang en is de filter toch goed. Wat
+   * zeker moet kloppen: de knop staat aan en er komt niet méér bij.
+   */
+  check('filter "verlopen" staat aan en filtert', filterAan === true && after <= before, `${before} -> ${after}`);
   const allOverdue = await evaluate(
     `[...document.querySelectorAll('.item')].every(i => i.classList.contains('is-overdue'))`,
   );
@@ -320,6 +366,8 @@ async function main() {
 
   const shot = await send('Page.captureScreenshot', { format: 'png' });
   const file = path.resolve('preview', 'interaction.png');
+  // preview/ staat niet in git en bestaat op een verse machine nog niet.
+  mkdirSync(path.dirname(file), { recursive: true });
   writeFileSync(file, Buffer.from(shot.data, 'base64'));
   console.log(`\nscreenshot: ${file}`);
 

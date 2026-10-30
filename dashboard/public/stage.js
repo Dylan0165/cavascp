@@ -844,8 +844,10 @@ function thema() {
 }
 
 function start() {
+  const uitUrl = new URLSearchParams(location.search).get('theme');
   const bewaard = localStorage.getItem('cavascp-theme');
-  if (bewaard) document.documentElement.dataset.theme = bewaard;
+  if (uitUrl === 'light' || uitUrl === 'dark') document.documentElement.dataset.theme = uitUrl;
+  else if (bewaard) document.documentElement.dataset.theme = bewaard;
 
   $('#theme').addEventListener('click', thema);
 

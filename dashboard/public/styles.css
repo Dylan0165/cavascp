@@ -442,7 +442,7 @@ select {
   background-size: 12px;
 }
 
-.search { position: relative; flex: 1 1 200px; min-width: 180px; max-width: 320px; }
+.search { position: relative; flex: 1 1 260px; min-width: 220px; max-width: none; }
 .search svg {
   position: absolute; left: 10px; top: 50%;
   width: 15px; height: 15px;
@@ -1981,4 +1981,441 @@ main {
    achtergrond in plaats van transparantie. */
 @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
   .topbar, .toolbar { background: var(--bg); }
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   Verfijning — 2026-10
+
+   Dezelfde identiteit (crème en den), maar met meer lucht, een strakkere
+   typografische trap en één accent dat je alleen ziet waar het iets betekent.
+   Dit blok staat bewust achteraan: het overschrijft de componenten hierboven
+   zonder ze te herbouwen, zodat de JavaScript er niets van merkt.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+:root {
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 18px;
+  --radius-xl: 24px;
+
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 24px;
+  --space-6: 32px;
+  --space-7: 48px;
+
+  --shadow-1: 0 1px 2px oklch(20% 0.02 152 / 0.06), 0 1px 1px oklch(20% 0.02 152 / 0.04);
+  --shadow-2: 0 6px 20px -8px oklch(24% 0.03 152 / 0.18), 0 2px 6px -2px oklch(24% 0.03 152 / 0.1);
+  --shadow-3: 0 24px 60px -24px oklch(20% 0.03 152 / 0.35), 0 8px 24px -12px oklch(20% 0.03 152 / 0.2);
+
+  --surface: var(--panel);
+  --ring: 0 0 0 2px var(--bg), 0 0 0 4px var(--accent);
+}
+
+/*
+ * Twee variabelen die wel gebruikt werden maar nooit gedefinieerd: --pine-950
+ * (waardoor --bg in het donkere thema leeg bleef) en --panel (waardoor panelen
+ * geen achtergrond hadden). Hier alsnog vastgelegd.
+ */
+:root {
+  --pine-950: oklch(17% 0.014 155);
+  --panel: var(--surface-1);
+}
+
+[data-theme="dark"] {
+  --shadow-1: 0 1px 2px oklch(8% 0.02 155 / 0.5);
+  --shadow-2: 0 8px 24px -10px oklch(5% 0.02 155 / 0.6), 0 2px 6px -2px oklch(5% 0.02 155 / 0.4);
+  --shadow-3: 0 30px 70px -30px oklch(0% 0 0 / 0.75), 0 10px 30px -14px oklch(0% 0 0 / 0.5);
+}
+
+/* ── Grondslag ─────────────────────────────────────────────────────────── */
+
+body {
+  font-size: 16px;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+main { padding-top: var(--space-5); }
+
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+* { scrollbar-width: thin; scrollbar-color: var(--line-strong) transparent; }
+*::-webkit-scrollbar { width: 10px; height: 10px; }
+*::-webkit-scrollbar-thumb { background: var(--line-strong); border-radius: 99px; border: 3px solid transparent; background-clip: content-box; }
+*::-webkit-scrollbar-track { background: transparent; }
+
+/* ── Topbar ────────────────────────────────────────────────────────────── */
+
+.topbar {
+  position: sticky;
+  top: 0;
+  z-index: 30;
+  min-height: 60px;
+  padding: 0 clamp(16px, 3vw, 40px);
+  background: color-mix(in oklch, var(--bg) 78%, transparent);
+  backdrop-filter: saturate(140%) blur(14px);
+  border-bottom: 1px solid var(--line);
+}
+
+/* De topbar mag nooit afbreken: hij is de vaste rand van de app. */
+.topbar,
+.topbar__left,
+.topbar__right { flex-wrap: nowrap; }
+
+.topbar { gap: var(--space-4); }
+.topbar .btn { height: 32px; padding: 0 12px; font-size: 12.5px; }
+.topbar .btn--icon { width: 32px; padding: 0; }
+
+.topbar__id strong { font-size: 15px; letter-spacing: -0.01em; white-space: nowrap; }
+.topbar__id .muted { font-size: 12px; color: var(--ink-3); }
+.mark { width: 26px; height: 26px; border-radius: 8px; }
+.stamp { font-size: 12px; color: var(--ink-3); white-space: nowrap; }
+
+/* ── Masthead ──────────────────────────────────────────────────────────── */
+
+.masthead {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: var(--space-6);
+  align-items: end;
+  padding: var(--space-5) 0 var(--space-6);
+  border-bottom: 1px solid var(--line);
+  margin-bottom: var(--space-5);
+}
+
+.eyebrow {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+}
+
+.masthead h1 {
+  font-size: clamp(34px, 4vw, 46px);
+  line-height: 1.02;
+  letter-spacing: -0.035em;
+  font-weight: 640;
+  margin: var(--space-2) 0 var(--space-3);
+}
+
+.lede {
+  margin: 0;
+  max-width: 58ch;
+  font-size: 15px;
+  line-height: 1.55;
+  color: var(--ink-2);
+}
+
+/* ── Kerncijfers als één strip ─────────────────────────────────────────── */
+
+.vitals {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(96px, auto));
+  gap: 0;
+  padding: 0;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-1);
+  overflow: hidden;
+}
+
+.vital {
+  padding: var(--space-4) var(--space-5);
+  border-left: 1px solid var(--line);
+  min-width: 0;
+}
+.vital:first-child { border-left: 0; }
+
+.vital dt {
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+  white-space: nowrap;
+}
+
+.vital dd {
+  margin: var(--space-2) 0 0;
+  font-family: var(--font-display);
+  font-size: 32px;
+  line-height: 1;
+  font-weight: 600;
+  letter-spacing: -0.03em;
+  font-variant-numeric: tabular-nums;
+}
+
+.vital--alert dd { color: var(--danger); }
+.vital--warn dd { color: var(--attention); }
+.vital--ok dd { color: var(--accent); }
+
+@media (max-width: 1100px) {
+  .vitals { grid-template-columns: repeat(2, 1fr); }
+  .vital { border-left: 0; border-top: 1px solid var(--line); }
+  .vital:nth-child(-n + 2) { border-top: 0; }
+}
+
+/* ── Semesters als rustige pillen ──────────────────────────────────────── */
+
+.semesters {
+  gap: var(--space-2);
+  padding-bottom: var(--space-4);
+  margin-bottom: var(--space-2);
+}
+
+.semester {
+  border-radius: var(--radius-lg);
+  padding: var(--space-2) var(--space-4);
+  background: transparent;
+  border: 1px solid var(--line);
+  box-shadow: none;
+  gap: 2px;
+}
+
+.semester:hover { background: var(--surface-2); border-color: var(--line-strong); }
+
+.semester.is-on {
+  background: var(--ink);
+  border-color: var(--ink);
+  color: var(--bg);
+  box-shadow: var(--shadow-2);
+}
+.semester.is-on .semester__label,
+.semester.is-on .semester__meta,
+.semester.is-on .semester__open,
+.semester.is-on .semester__courses,
+.semester.is-on .semester__gaps { color: color-mix(in oklch, var(--bg) 86%, transparent); }
+.semester.is-on .semester__late { color: color-mix(in oklch, var(--clay-300) 90%, white); }
+
+.semester__label { font-size: 13px; font-weight: 600; }
+.semester__meta { font-size: 11.5px; }
+.semester__now {
+  font-size: 9.5px;
+  padding: 2px 6px;
+  border-radius: 999px;
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+.semester.is-on .semester__now { background: color-mix(in oklch, var(--bg) 22%, transparent); color: var(--bg); }
+
+/* ── Tabs ──────────────────────────────────────────────────────────────── */
+
+.tabs {
+  gap: var(--space-1);
+  padding: 4px;
+  border-bottom: 0;
+  background: var(--surface-2);
+  border-radius: 999px;
+  width: fit-content;
+  margin-bottom: var(--space-4);
+}
+
+.tab {
+  padding: 8px 16px;
+  border-radius: 999px;
+  font-size: 13.5px;
+  font-weight: 550;
+  color: var(--ink-3);
+  transition: color 140ms ease, background 140ms ease;
+}
+.tab:hover { color: var(--ink); background: color-mix(in oklch, var(--surface) 70%, transparent); }
+.tab.is-on {
+  background: var(--surface);
+  color: var(--ink);
+  box-shadow: var(--shadow-1);
+}
+
+/* ── Werkbalk ──────────────────────────────────────────────────────────── */
+
+.toolbar {
+  gap: var(--space-3);
+  padding: var(--space-3);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-1);
+  margin-bottom: var(--space-5);
+}
+
+.seg {
+  background: var(--surface-2);
+  border-radius: 999px;
+  padding: 3px;
+  gap: 2px;
+}
+.seg__btn {
+  padding: 6px 12px;
+  border-radius: 999px;
+  font-size: 13px;
+  font-weight: 500;
+}
+.seg__btn.is-on { background: var(--surface); color: var(--ink); box-shadow: var(--shadow-1); }
+
+.field__label { font-size: 11px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--ink-3); }
+.input, select, .search input {
+  height: 36px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--line);
+  background: var(--bg);
+  font-size: 13.5px;
+  transition: border-color 140ms ease, box-shadow 140ms ease;
+}
+.input:hover, select:hover, .search input:hover { border-color: var(--line-strong); }
+.input:focus, select:focus, .search input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); outline: none; }
+
+/* ── Panelen ───────────────────────────────────────────────────────────── */
+
+.panel {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-1);
+  overflow: hidden;
+}
+
+.panel__head {
+  padding: var(--space-4) var(--space-5);
+  border-bottom: 1px solid var(--line);
+  background: transparent;
+}
+
+.panel__head h2 {
+  font-size: 15px;
+  font-weight: 620;
+  letter-spacing: -0.01em;
+  margin: 0;
+}
+
+.count {
+  font-size: 11px;
+  font-weight: 600;
+  padding: 3px 8px;
+  border-radius: 999px;
+  background: var(--surface-2);
+  color: var(--ink-3);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ── Tijdlijn ──────────────────────────────────────────────────────────── */
+
+.item {
+  display: grid;
+  grid-template-columns: 72px minmax(0, 1fr) auto;
+  gap: var(--space-5);
+  padding: var(--space-4) var(--space-5);
+  border-bottom: 1px solid var(--line);
+  align-items: start;
+  transition: background 140ms ease;
+}
+.item:hover { background: var(--surface-2); }
+
+.item__when { font-size: 12.5px; color: var(--ink-3); font-variant-numeric: tabular-nums; }
+.item__name { font-size: 15px; font-weight: 600; letter-spacing: -0.005em; }
+.item__meta { font-size: 12.5px; color: var(--ink-3); }
+.item__course { font-size: 12px; color: var(--ink-3); }
+
+.item__tags { gap: 6px; margin-top: var(--space-2); }
+
+.tag, .tag--lo, .tag--more {
+  font-size: 10.5px;
+  font-weight: 550;
+  padding: 3px 8px;
+  border-radius: 999px;
+  background: var(--surface-2);
+  border: 1px solid transparent;
+  color: var(--ink-2);
+  letter-spacing: 0.01em;
+}
+.tag--lo { background: var(--accent-soft); color: var(--accent); }
+
+.pill {
+  font-size: 11px;
+  font-weight: 600;
+  padding: 4px 10px;
+  border-radius: 999px;
+  letter-spacing: 0.01em;
+}
+
+/* ── Criteria ──────────────────────────────────────────────────────────── */
+
+.crit__row {
+  min-height: 46px;
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--radius-sm);
+  transition: background 140ms ease;
+}
+.crit__row:hover { background: var(--surface-2); }
+
+.crit__label { font-size: 13.5px; line-height: 1.4; }
+.crit__status { font-size: 11.5px; }
+.crit__courses { font-size: 11px; color: var(--ink-3); }
+
+.crit__check {
+  width: 18px;
+  height: 18px;
+  border-radius: 6px;
+  border: 1.5px solid var(--line-strong);
+  transition: border-color 140ms ease, background 140ms ease;
+}
+.crit__check:hover { border-color: var(--accent); }
+
+/* ── Knoppen ───────────────────────────────────────────────────────────── */
+
+.btn {
+  height: 36px;
+  padding: 0 14px;
+  border-radius: var(--radius-md);
+  font-size: 13.5px;
+  font-weight: 550;
+  letter-spacing: -0.005em;
+  transition: transform 120ms ease, background 140ms ease, border-color 140ms ease, box-shadow 140ms ease;
+}
+.btn:hover { box-shadow: var(--shadow-1); }
+.btn:active { transform: translateY(1px); }
+.btn--ghost { border: 1px solid var(--line); background: var(--surface); color: var(--ink-2); }
+.btn--ghost:hover { border-color: var(--line-strong); color: var(--ink); }
+.btn--sm { height: 30px; padding: 0 10px; font-size: 12.5px; }
+.btn--icon { width: 36px; padding: 0; }
+.btn--primary { background: var(--accent); color: var(--bg); border: 1px solid transparent; }
+.btn--primary:hover { background: color-mix(in oklch, var(--accent) 88%, black); }
+
+/* ── Detailpaneel ──────────────────────────────────────────────────────── */
+
+.drawer__scrim { background: color-mix(in oklch, var(--ink) 42%, transparent); backdrop-filter: blur(3px); }
+.drawer__panel {
+  border-left: 1px solid var(--line);
+  border-radius: var(--radius-xl) 0 0 var(--radius-xl);
+  box-shadow: var(--shadow-3);
+  background: var(--surface);
+}
+.drawer__top { padding: var(--space-5); border-bottom: 1px solid var(--line); }
+.drawer__body { padding: var(--space-5); }
+
+/* ── Lege toestand ─────────────────────────────────────────────────────── */
+
+.empty {
+  padding: var(--space-7) var(--space-5);
+  text-align: center;
+  color: var(--ink-3);
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+/* ── Beweging ──────────────────────────────────────────────────────────── */
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }
