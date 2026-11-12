@@ -14,8 +14,8 @@ tags:
 ## Wat hier staat
 
 Deze collectie laat zien hoe ik me heb georiënteerd op AI als vakgebied: wat ik
-heb gebouwd, wat ik heb onderzocht, en wat ik daarvan heb geleerd. Er staan
-twee bewijsstukken in, en ze horen bij elkaar.
+heb gebouwd, wat ik heb onderzocht en wat ik daarvan heb geleerd. Er staan vier
+bewijsstukken in, en ze horen bij elkaar.
 
 ## In welke volgorde
 
