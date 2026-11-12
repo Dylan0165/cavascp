@@ -27,6 +27,9 @@
  */
 
 import { timingSafeEqual, randomBytes } from 'node:crypto';
+import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import path from 'node:path';
+import { inProject } from '../../mcp/lib/paden.mjs';
 
 /** Alles wat als "deze machine" telt. */
 const LOCAL_HOSTS = new Set(['localhost', '127.0.0.1', '[::1]', '::1']);
@@ -45,7 +48,36 @@ export function createSecurity({ port, allowRemote = false, rateLimit = 10 } = {
    * nieuwe. Een oude cookie is daarmee in één keer waardeloos — belangrijker
    * dan een aflopende datum, want er is maar één token voor de hele server.
    */
-  let sessionToken = randomBytes(32).toString('base64url');
+  /*
+   * De sessiesleutel wordt bewaard, niet alleen in het geheugen gehouden.
+   *
+   * Eerst werd er bij elke start een nieuwe gemaakt, en dan was je na elke
+   * herstart van de service uitgelogd. Met een bestand overleeft de sessie een
+   * herstart; bij inloggen en uitloggen wordt er alsnog een nieuwe gemaakt,
+   * dus een gestolen cookie sterft meteen.
+   */
+  const sessiePad = path.join(process.env.CAVASCP_DATA_DIR || inProject('data'), '.sessie');
+
+  function leesSessie() {
+    try {
+      const bewaard = readFileSync(sessiePad, 'utf8').trim();
+      return bewaard.length >= 32 ? bewaard : null;
+    } catch {
+      return null;
+    }
+  }
+
+  function bewaarSessie(token) {
+    try {
+      mkdirSync(path.dirname(sessiePad), { recursive: true });
+      writeFileSync(sessiePad, token, { mode: 0o600 });
+    } catch {
+      /* zonder bestand werkt de sessie nog steeds, alleen niet over een herstart */
+    }
+  }
+
+  let sessionToken = leesSessie() ?? randomBytes(32).toString('base64url');
+  bewaarSessie(sessionToken);
   const cookieName = 'cavascp_session';
 
   /**
@@ -185,6 +217,7 @@ export function createSecurity({ port, allowRemote = false, rateLimit = 10 } = {
    */
   function vernieuwSessie() {
     sessionToken = randomBytes(32).toString('base64url');
+    bewaarSessie(sessionToken);
     return sessionToken;
   }
 
