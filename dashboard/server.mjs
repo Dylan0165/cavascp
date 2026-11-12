@@ -1474,6 +1474,31 @@ const server = createServer(async (req, res) => {
     }
 
     /*
+     * Eén bestand uit de vault, als platte tekst. Zodat je een notitie kunt
+     * lezen en kopiëren zonder eerst een zip te downloaden en Obsidian te
+     * openen. Alleen lezen, en alleen binnen de vault-map.
+     */
+    if (pathname === '/api/vault/bestand' && req.method === 'GET') {
+      const gevraagd = new URL(req.url, 'http://localhost').searchParams.get('pad') ?? '';
+      const basis = path.resolve(inProject('vault'));
+      const doel = path.resolve(basis, gevraagd);
+
+      if (!doel.startsWith(basis + path.sep)) {
+        return sendJson(res, 403, { error: 'verboden' });
+      }
+
+      const inhoud = await readFile(doel).catch(() => null);
+      if (!inhoud) return sendJson(res, 404, { error: 'bestand niet gevonden' });
+
+      res.writeHead(200, {
+        ...security.headers(),
+        'Content-Type': 'text/plain; charset=utf-8',
+        'Cache-Control': 'no-store',
+      });
+      return res.end(inhoud);
+    }
+
+    /*
      * De vault als zip. De map staat op deze machine; om hem in Obsidian te
      * openen moet hij naar je eigen laptop. Eén bestand is de simpelste manier.
      */
