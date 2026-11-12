@@ -7,7 +7,7 @@ tags:
   - reflectie
 ---
 
-# Reflectie — het semester tot zover
+# Reflectie: het semester tot zover
 
 > [!info] Hoe dit document werkt
 > Dit is de doorlopende reflectie over het hele semester. Hij blijft staan en
@@ -26,9 +26,8 @@ gebruiken als een onderdeel dat je aanroept en waarvan je de uitvoer vertrouwt
 of niet.
 
 Waarom ik de minor AI koos: ik zag om me heen dat AI in infrastructuur en
-security geen bijzaak meer is — het zit in monitoring, in detectie, in
-beheer — en ik wilde begrijpen wat er onder zit in plaats van het alleen te
-gebruiken.
+security geen bijzaak meer is. Het zit in monitoring, in detectie, in beheer.
+En ik wilde begrijpen wat er onder zit in plaats van het alleen te gebruiken.
 
 ## Wat ik deed
 
@@ -84,7 +83,7 @@ repository is geen documentatie.
 Wat ik daarvan heb geleerd is niet "meer schrijven". Het is dat **verantwoording
 deel van het werk is**, niet iets wat je erachteraan plakt. Als ik niet kan
 uitleggen welke keuze ik maakte en waarom, is het voor een ander niet te
-beoordelen — en dus niet te waarderen.
+beoordelen, en dus niet te waarderen.
 
 ## Wat ik vanaf nu anders doe
 
@@ -105,17 +104,17 @@ Deze minor heeft me daar nieuwsgieriger in gemaakt, niet geruster.
 
 ## Aanvullingen per inlevermoment
 
-### Tweede review — 13 november 2026
+### Tweede review: 13 november 2026
 
 - Portfolio opnieuw ingedeeld naar de drie collecties, met leeswijzer en
   bewijsbeschrijvingen.
 - Verantwoording toegevoegd over de inzet van AI bij het RAG-verslag en bij
   het klantproject.
 
-### Derde review — december 2026
+### Derde review: december 2026
 
 ⟦aanvullen: wat is er sinds de tweede review gedaan en geleerd?⟧
 
-### Eindbeoordeling — januari 2027
+### Eindbeoordeling: januari 2027
 
 ⟦aanvullen: het hele semester in vogelvlucht, met de stage als vooruitblik.⟧

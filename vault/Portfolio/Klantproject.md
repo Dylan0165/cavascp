@@ -8,7 +8,7 @@ tags:
 # Klantproject
 
 > [!info] Waar dit voor is
-> Tweede review — V-OL-MAIFS. Deadline 13 november 2026, 22:59.
+> Tweede review: V-OL-MAIFS. Deadline 13 november 2026, 22:59.
 > In Portflow, collectie **"Klantproject"**.
 
 ## Introductie en doel

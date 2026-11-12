@@ -8,7 +8,7 @@ tags:
 # Ik en de minor
 
 > [!info] Waar dit voor is
-> Tweede review — V-OL-MAIFS. Deadline 13 november 2026, 22:59.
+> Tweede review: V-OL-MAIFS. Deadline 13 november 2026, 22:59.
 > In Portflow, collectie **"ik en de minor"**.
 
 ## Studieachtergrond
@@ -17,17 +17,17 @@ IT-infrastructuur en cybersecurity. Voordat ik aan deze minor begon bouwde ik
 een aantal projecten waarin ik vooral leerde om systemen aan elkaar te knopen
 en om te gaan met API's, servers en security:
 
-- **Krava** — screenshots automatisch naar een Word-document, met het
+- **Krava**: screenshots automatisch naar een Word-document, met het
   vision-model van DeepSeek (Node.js).
-- **Clipfarmer** — lange video's naar TikTok-clips: transcriptie met Whisper,
+- **Clipfarmer**: lange video's naar TikTok-clips. Transcriptie met Whisper,
   selectie met een taalmodel, verticaal renderen met ffmpeg.
-- **cavascp** — een Canvas-koppeling met een MCP-server en een dashboard dat
+- **cavascp**: een Canvas-koppeling met een MCP-server en een dashboard dat
   portfolio-deadlines en rubric-dekking leest via de Canvas REST API.
-- **Krava Pay** — een testomgeving voor een betaalsysteem in Express, React en
+- **Krava Pay**: een testomgeving voor een betaalsysteem in Express, React en
   TypeScript, met kosten en marge doorgerekend.
-- **Tradingbot** — een BTC-EUR trendbot in Python tegen de Bitvavo-API, in
+- **Tradingbot**: een BTC-EUR trendbot in Python tegen de Bitvavo-API, in
   paper mode, met een eigen dashboard.
-- **Life Dashboard** — een persoonlijk dashboard in React en TypeScript dat
+- **Life Dashboard**: een persoonlijk dashboard in React en TypeScript dat
   volledig lokaal draait.
 
 Wat me daarin steeds interesseerde: hoe je zo'n systeem veilig opzet (tokens

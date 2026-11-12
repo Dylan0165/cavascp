@@ -4,7 +4,7 @@ tags:
 ---
 # Start hier
 
-Dit is de vault van Dylan. Het is een map met markdown-bestanden — niets meer,
+Dit is de vault van Dylan. Het is een map met markdown-bestanden: niets meer,
 niets minder. Alles wat je hier schrijft kun je ook lezen zonder Obsidian.
 
 ## Waar staat wat

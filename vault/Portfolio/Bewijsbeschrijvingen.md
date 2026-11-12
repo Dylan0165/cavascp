@@ -48,23 +48,41 @@ tags:
 > tussenversies te bekritiseren en om mijn eigen formuleringen scherper te
 > krijgen. De opzet, de meting en de conclusies zijn van mij; het model heeft
 > niet bedacht wat er in het verslag staat. Wat ik daarvan heb geleerd is dat je
-> zo'n model het beste kunt inzetten als tegenlezer, niet als schrijver — en dat
+> zo'n model het beste kunt inzetten als tegenlezer, niet als schrijver, en dat
 > je dat achteraf moet kunnen laten zien, anders is het niet te beoordelen.
 > Dit is het bewijs bij *AI-Augmented Learning*.
 
 ## Collectie klantproject
 
-### AI Editor — Studio040
+### AI Editor (Studio040)
 
-> De redactietool die we voor Studio040 hebben gebouwd. Eén artikel gaat erin,
-> vier vormen komen eruit: een samenvatting, een langere tekst, een Engelse
-> versie en een audioversie. Ik lever de applicatie en de repository in omdat
-> het eindproduct alleen te beoordelen is als je ziet hoe het is opgebouwd: de
-> koppeling met het model, de manier waarop de tekst in blokken wordt geknipt en
-> de grenzen die we hebben gesteld aan wat het model mag doen. In de repository
+> De redactietool die ik voor Studio040 heb gebouwd. Eén artikel gaat erin, vier
+> kanalen komen eruit: een pushmelding, een langere tekst, een Engelse versie en
+> een radioscript met tijdcodes. Ik lever de applicatie en de repository in
+> omdat het eindproduct alleen te beoordelen is als je ziet hoe het is
+> opgebouwd: de koppeling met het model, de manier waarop de tekst in blokken
+> wordt geknipt, de zes controles op namen, bedragen en lengte, en de
+> menselijke goedkeuring voordat er iets naar buiten gaat. In de repository
 > staat een README met de opzet en de gemaakte keuzes. Het bewijs hoort bij
-> *Professional Standard* (de aanpak van klantvraag naar product) en *Model
-> Interaction & Adaptation* (hoe het model is ingezet en gecontroleerd).
+> *Professional Standard* (van klantvraag naar product, met verantwoording) en
+> *Model Interaction & Adaptation* (hoe het model is ingezet en gecontroleerd).
+
+### AI-Editor-Presentatie-DylanSchuurman.pptx
+
+> De presentatie waarmee ik het project heb toegelicht: het probleem, de
+> oplossing, de architectuur, de afwegingen (Tauri in plaats van Electron,
+> DeepSeek in plaats van een eigen model) en de cijfers van de demo. Ik lever
+> hem in omdat hij laat zien dat ik het werk aan een niet-technische klant kan
+> uitleggen zonder de code erbij te halen. Het bewijs hoort bij *Professional
+> Standard* en bij *Personal Leadership*: in de presentatie staat ook de keuze
+> om geen autopilot te bouwen.
+
+### Reflectie Studio040
+
+> Mijn reflectie op het klantproject: wat ik bouwde, welke ontwerpkeuzes ik
+> maakte, wat ik ervan leerde en wat ik de volgende keer anders doe. Ik lever
+> hem in omdat de beoordeling niet alleen over het product gaat, maar ook over
+> de vraag of ik kan uitleggen waarom ik het zo heb gedaan.
 
 ## Collectie Persoonlijk project
 
@@ -76,7 +94,7 @@ tags:
 > zien dat ik een systeem kan bouwen dat met een externe API werkt, met
 > authenticatie, foutafhandeling en een bron die soms traag of stuk is. Ik heb
 > het project zelf bedacht en afgebakend, en het grootste deel met AI als
-> bouwpartner gemaakt — met de commit-geschiedenis als bewijs van het proces.
+> bouwpartner gemaakt, met de commit-geschiedenis als bewijs van het proces.
 > Het bewijs hoort bij *AI-Augmented Learning*, *Professional Standard* en
 > *Personal Leadership*.
 
