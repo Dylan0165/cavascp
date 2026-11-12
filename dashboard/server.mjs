@@ -1490,9 +1490,19 @@ const server = createServer(async (req, res) => {
       const inhoud = await readFile(doel).catch(() => null);
       if (!inhoud) return sendJson(res, 404, { error: 'bestand niet gevonden' });
 
+      const extensie = path.extname(doel).toLowerCase();
+      const types = {
+        '.md': 'text/plain; charset=utf-8',
+        '.docx': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+        '.pdf': 'application/pdf',
+        '.pptx': 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+        '.png': 'image/png',
+      };
+
       res.writeHead(200, {
         ...security.headers(),
-        'Content-Type': 'text/plain; charset=utf-8',
+        'Content-Type': types[extensie] ?? 'application/octet-stream',
+        ...(extensie === '.md' ? {} : { 'Content-Disposition': `attachment; filename="${path.basename(doel)}"` }),
         'Cache-Control': 'no-store',
       });
       return res.end(inhoud);

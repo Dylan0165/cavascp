@@ -63,21 +63,38 @@ export function loopBestanden(map, basis = map) {
  * @returns {Buffer}
  */
 export function zipMap(map, { compressie = true } = {}) {
-  const bestanden = loopBestanden(map);
+  const bestanden = loopBestanden(map).map((bestand) => ({
+    naam: bestand.relatief,
+    data: readFileSync(bestand.pad),
+    datum: statSync(bestand.pad).mtime,
+  }));
+
+  return zipBestanden(bestanden, { compressie });
+}
+
+/**
+ * Een zip uit losse buffers, zonder tussenmap.
+ *
+ * Nodig voor een .docx: dat is een zip met een vaste indeling, en de inhoud
+ * bestaat uit strings die je net hebt gebouwd.
+ *
+ * @param {{naam: string, data: Buffer|string, datum?: Date}[]} bestanden
+ */
+export function zipBestanden(bestanden, { compressie = true } = {}) {
 
   const lokaal = [];
   const centraal = [];
   let offset = 0;
 
   for (const bestand of bestanden) {
-    const ruw = readFileSync(bestand.pad);
+    const ruw = Buffer.isBuffer(bestand.data) ? bestand.data : Buffer.from(bestand.data, 'utf8');
     const inhoud = compressie ? deflateRawSync(ruw, { level: 6 }) : ruw;
     const methode = compressie ? 8 : 0;
-    const naam = Buffer.from(bestand.relatief, 'utf8');
+    const naam = Buffer.from(bestand.naam, 'utf8');
     const crc = crc32(ruw);
 
     // Dos-tijd: alleen netjes binnen de grenzen houden, niet belangrijk.
-    const datum = new Date(Math.min(statSync(bestand.pad).mtimeMs, Date.UTC(2107, 11, 31)));
+    const datum = new Date(Math.min((bestand.datum ?? new Date()).getTime(), Date.UTC(2107, 11, 31)));
     const tijd = ((datum.getHours() << 11) | (datum.getMinutes() << 5) | (datum.getSeconds() / 2)) & 0xffff;
     const dag = (((datum.getFullYear() - 1980) << 9) | ((datum.getMonth() + 1) << 5) | datum.getDate()) & 0xffff;
 
