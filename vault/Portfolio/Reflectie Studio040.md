@@ -39,8 +39,8 @@ werkte goed, vooral omdat we afspraken wat er af moest zijn voordat iemand aan
 iets begon. Als een onderdeel vertraging opliep, wisten we dat op tijd en
 konden we schuiven in plaats van achteraf te repareren.
 
-⟦vul in: wat was jouw rol in die overleggen? Bijvoorbeeld: nam jij het
-initiatief voor de planning, of bewaakte je de technische lijn?⟧
+Ik nam daarin de technische lijn op me: de architectuur, de koppeling met het
+model en de controles voordat er iets naar buiten gaat.
 
 ## Wat ik leerde
 

@@ -1,154 +1,101 @@
 #!/usr/bin/env node
 /**
- * Markdown naar Word.
+ * Markdown naar Word, met de opmaak van Krava.
  *
- * Waarom zelf en niet met een pakket: een .docx is een zip met een paar vaste
- * XML-bestanden erin. We hebben al een zip-schrijver in het project, dus het
- * enige dat erbij hoeft is het document zelf. Dat scheelt een afhankelijkheid
- * van een halve megabyte voor een functie die we één keer per document nodig
- * hebben.
+ * Krava heeft al een generator die een nette brief oplevert: omslag,
+ * inhoudsopgave, genummerde koppen, tabellen met een gevulde kopregel,
+ * callouts, kop- en voettekst en paginanummers. Die gebruiken we hier, in
+ * plaats van zelf XML te maken. Dit script doet alleen de vertaling van
+ * markdown naar de blokken die Krava begrijpt.
  *
- * Wat het ondersteunt, en niet meer dan dat:
- *   # / ## / ###   koppen
- *   alinea's
- *   - lijstjes     bullets
- *   | tabellen |   met een kopregel
- *   > citaten      ingesprongen, cursief
- *   **vet**        binnen een alinea
- *   [tekst](url)   als platte tekst met het adres erachter
- *
- *   node tools/md-naar-docx.mjs "vault/Documentatie/cavascp documentatie.md"
  *   node tools/md-naar-docx.mjs --alles
+ *   node tools/md-naar-docx.mjs "vault/Documentatie/cavascp documentatie.md"
  */
 
-import { readFileSync, writeFileSync, readdirSync } from 'node:fs';
+import { readFileSync, writeFileSync, readdirSync, existsSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { zipBestanden } from '../dashboard/lib/zip-schrijf.mjs';
+
+import { bouwDocx } from '../mcp/lib/docx.mjs';
 
 const HIER = path.dirname(fileURLToPath(import.meta.url));
 const PROJECT = path.resolve(HIER, '..');
 
-/* ───────────────────────────── XML-hulpjes ────────────────────────────── */
+/* ─────────────────────────── markdown lezen ───────────────────────────── */
 
-const esc = (tekst) =>
+/**
+ * Links en losse adressen leesbaar maken. Krava zet **vet** en `code` zelf om,
+ * dus die laten we staan.
+ */
+const schoon = (tekst) =>
   String(tekst ?? '')
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;');
+    .replace(/\[([^\]]+)\]\(([^)]+)\)/g, '$1 ($2)')
+    .replace(/<((https?:\/\/)[^>]+)>/g, '$1')
+    .replace(/<[^>]+>/g, '')
+    .trim();
 
-/** **vet** en `code` omzetten naar Word-runs. */
-function runs(tekst) {
-  const stukken = [];
-  const patroon = /(\*\*[^*]+\*\*|`[^`]+`|\[[^\]]+\]\([^)]+\)|<https?:\/\/[^>]+>)/g;
-  let laatste = 0;
+const lijstRegel = (regel) => /^([-*]|\d+\.)\s+/.exec(regel);
 
-  for (const match of String(tekst).matchAll(patroon)) {
-    if (match.index > laatste) stukken.push({ tekst: tekst.slice(laatste, match.index) });
-
-    const stuk = match[0];
-    if (stuk.startsWith('**')) stukken.push({ tekst: stuk.slice(2, -2), vet: true });
-    else if (stuk.startsWith('`')) stukken.push({ tekst: stuk.slice(1, -1), code: true });
-    else if (stuk.startsWith('<')) stukken.push({ tekst: stuk.slice(1, -1) });
-    else {
-      const link = /\[([^\]]+)\]\(([^)]+)\)/.exec(stuk);
-      stukken.push({ tekst: `${link[1]} (${link[2]})` });
-    }
-
-    laatste = match.index + stuk.length;
-  }
-
-  if (laatste < tekst.length) stukken.push({ tekst: tekst.slice(laatste) });
-
-  return stukken
-    .filter((stuk) => stuk.tekst !== '')
-    .map((stuk) => {
-      const eigenschappen = [
-        stuk.vet ? '<w:b/>' : '',
-        stuk.code ? '<w:rFonts w:ascii="Consolas" w:hAnsi="Consolas"/>' : '',
-      ].join('');
-
-      return `<w:r>${eigenschappen ? `<w:rPr>${eigenschappen}</w:rPr>` : ''}<w:t xml:space="preserve">${esc(stuk.tekst)}</w:t></w:r>`;
-    })
-    .join('');
-}
-
-const alinea = (tekst, { stijl, cursief = false, inset = 0 } = {}) => {
-  const ppr = [
-    stijl ? `<w:pStyle w:val="${stijl}"/>` : '',
-    inset ? `<w:ind w:left="${inset}"/>` : '',
-  ].join('');
-
-  const rpr = cursief ? '<w:rPr><w:i/></w:rPr>' : '';
-  const inhoud = cursief
-    ? `<w:r>${rpr}<w:t xml:space="preserve">${esc(tekst)}</w:t></w:r>`
-    : runs(tekst);
-
-  return `<w:p>${ppr ? `<w:pPr>${ppr}</w:pPr>` : ''}${inhoud}</w:p>`;
-};
-
-const bullet = (tekst) =>
-  `<w:p><w:pPr><w:pStyle w:val="Lijst"/><w:numPr><w:ilvl w:val="0"/><w:numId w:val="1"/></w:numPr></w:pPr>${runs(tekst)}</w:p>`;
-
-/** Een tabel met een kopregel, met randen. */
-function tabel(rijen) {
-  const breedte = Math.floor(9000 / Math.max(1, rijen[0].length));
-
-  const cel = (tekst, { kop = false } = {}) =>
-    `<w:tc><w:tcPr><w:tcW w:w="${breedte}" w:type="dxa"/>${
-      kop ? '<w:shd w:val="clear" w:color="auto" w:fill="EFEFEA"/>' : ''
-    }</w:tcPr><w:p>${
-      kop
-        ? `<w:r><w:rPr><w:b/></w:rPr><w:t xml:space="preserve">${esc(tekst)}</w:t></w:r>`
-        : runs(tekst)
-    }</w:p></w:tc>`;
-
-  const rand = 'w:val="single" w:sz="4" w:space="0" w:color="CCCCC4"';
-
-  return `<w:tbl>
-<w:tblPr><w:tblW w:w="0" w:type="auto"/><w:tblBorders>
-<w:top ${rand}/><w:left ${rand}/><w:bottom ${rand}/><w:right ${rand}/>
-<w:insideH ${rand}/><w:insideV ${rand}/>
-</w:tblBorders></w:tblPr>
-${rijen
-  .map(
-    (rij, index) =>
-      `<w:tr>${index === 0 ? '<w:trPr><w:tblHeader/></w:trPr>' : ''}${rij
-        .map((celTekst) => cel(celTekst, { kop: index === 0 }))
-        .join('')}</w:tr>`,
-  )
-  .join('\n')}
-</w:tbl><w:p/>`;
-}
-
-/* ─────────────────────────── markdown ontleden ────────────────────────── */
-
-export function markdownNaarBlokken(markdown) {
+/** Waar een witregel tussen moet, en waar niet. */
+function markdownNaarProject(markdown, { bestand = '' } = {}) {
   const regels = markdown.replace(/\r/g, '').split('\n');
-  const blokken = [];
 
-  let tabelRijen = null;
-  let alineaBuffer = [];
+  const project = {
+    titel: path.basename(bestand, '.md').replace(/^\w/, (c) => c.toUpperCase()),
+    subtitel: '',
+    auteur: 'Dylan Schuurman',
+    organisatie: 'Fontys Hogeschool ICT',
+    datum: new Date().toLocaleDateString('nl-NL', { day: 'numeric', month: 'long', year: 'numeric' }),
+    secties: [],
+    bronnen: [],
+  };
+
+  let sectie = null;
+  let inFrontmatter = false;
+  let inBronnen = false;
+  let buffer = [];
+  let tabel = null;
+  let lijst = null;
 
   const sluitAlinea = () => {
-    if (alineaBuffer.length) {
-      blokken.push(alinea(alineaBuffer.join(' ')));
-      alineaBuffer = [];
+    if (!buffer.length) return;
+    const tekst = schoon(buffer.join(' '));
+    if (sectie) {
+      sectie.blokken.push({ type: 'paragraph', tekst });
+    } else if (!project.subtitel) {
+      /*
+       * De eerste alinea wordt de ondertitel op de omslag en in de koptekst.
+       * Niet midden in een woord afkappen: zoek de laatste punt voor 180
+       * tekens, en val terug op de laatste spatie.
+       */
+      const grens = tekst.slice(0, 180);
+      const punt = grens.lastIndexOf('. ');
+      const spatie = grens.lastIndexOf(' ');
+      project.subtitel =
+        tekst.length <= 180 ? tekst : `${grens.slice(0, punt > 60 ? punt + 1 : spatie)}…`;
     }
+    buffer = [];
+  };
+
+  const sluitLijst = () => {
+    if (lijst && sectie) sectie.blokken.push(lijst);
+    lijst = null;
   };
 
   const sluitTabel = () => {
-    if (tabelRijen?.length) blokken.push(tabel(tabelRijen));
-    tabelRijen = null;
+    if (tabel && sectie) sectie.blokken.push(tabel);
+    tabel = null;
   };
 
-  let inFrontmatter = false;
+  const sluitAlles = () => {
+    sluitAlinea();
+    sluitLijst();
+    sluitTabel();
+  };
 
   for (let i = 0; i < regels.length; i += 1) {
     const regel = regels[i];
 
-    // Frontmatter overslaan (de eerste twee regels met ---).
     if (regel.trim() === '---' && (i === 0 || inFrontmatter)) {
       inFrontmatter = !inFrontmatter;
       continue;
@@ -157,181 +104,153 @@ export function markdownNaarBlokken(markdown) {
 
     if (/^\|/.test(regel)) {
       sluitAlinea();
+      sluitLijst();
+
       const cellen = regel
         .split('|')
         .slice(1, -1)
-        .map((cel) => cel.trim());
+        .map((cel) => schoon(cel.trim()));
 
-      // De scheidingsregel (|---|---|) hoort niet in de tabel.
       if (cellen.every((cel) => /^-{2,}$/.test(cel.replace(/[: ]/g, '')))) continue;
 
-      tabelRijen = tabelRijen ?? [];
-      tabelRijen.push(cellen);
+      if (!tabel) tabel = { type: 'table', kop: cellen, rijen: [] };
+      else tabel.rijen.push(cellen);
       continue;
     }
-
     sluitTabel();
 
     if (regel.trim() === '') {
       sluitAlinea();
+      sluitLijst();
       continue;
     }
 
     const kop = /^(#{1,3})\s+(.*)$/.exec(regel);
     if (kop) {
-      sluitAlinea();
+      sluitAlles();
       const niveau = kop[1].length;
-      blokken.push(alinea(kop[2], { stijl: niveau === 1 ? 'Titel' : niveau === 2 ? 'Kop1' : 'Kop2' }));
+      const titel = schoon(kop[2]);
+
+      if (niveau === 1) {
+        project.titel = titel;
+        continue;
+      }
+
+      if (niveau === 2) {
+        inBronnen = /^bronnen$/i.test(titel);
+        if (inBronnen) {
+          sectie = null;
+          continue;
+        }
+
+        sectie = { titel, niveau: 1, blokken: [] };
+        project.secties.push(sectie);
+        continue;
+      }
+
+      if (sectie) sectie.blokken.push({ type: 'subheading', tekst: titel, niveau: 3 });
       continue;
     }
 
-    /*
-     * Genummerde regels ("1. Eerste punt") zijn in markdown losse alinea's.
-     * Zonder deze tak plakt de parser ze aan elkaar tot één blok, en dan lees
-     * je "1. ... 2. ... 3. ..." als één zin.
-     */
-    if (/^\d+\.\s+/.test(regel)) {
+    const opsomming = lijstRegel(regel);
+    if (opsomming) {
       sluitAlinea();
-      blokken.push(alinea(regel));
-      continue;
-    }
 
-    if (/^[-*]\s+/.test(regel)) {
-      sluitAlinea();
-      blokken.push(bullet(regel.replace(/^[-*]\s+/, '')));
+      const tekst = schoon(regel.replace(/^([-*]|\d+\.)\s+/, ''));
+      const genummerd = /^\d+\./.test(opsomming[1]);
+
+      if (inBronnen) {
+        project.bronnen.push({ tekst });
+        continue;
+      }
+
+      if (!lijst) lijst = { type: 'list', items: [] };
+      /*
+       * Krava zet bij een genummerd punt geen teken neer (dat doet Word met
+       * een nummering die wij uit hebben staan). Dus het nummer hoort in de
+       * tekst zelf, anders verdwijnt de opsomming.
+       */
+      lijst.items.push({
+        tekst: genummerd ? `${opsomming[1].replace('.', '')}. ${tekst}` : tekst,
+        niveau: 0,
+        genummerd,
+      });
       continue;
     }
+    sluitLijst();
 
     if (/^>\s?/.test(regel)) {
       sluitAlinea();
-      blokken.push(alinea(regel.replace(/^>\s?/, ''), { cursief: true, inset: 360 }));
+      const tekst = schoon(regel.replace(/^>\s?/, ''));
+      if (!tekst || /^\[!/.test(tekst)) continue;
+      if (sectie) sectie.blokken.push({ type: 'callout', soort: 'note', tekst });
       continue;
     }
 
-    alineaBuffer.push(regel.trim());
+    buffer.push(regel.trim());
   }
 
-  sluitAlinea();
-  sluitTabel();
+  sluitAlles();
 
-  return blokken.join('\n');
+  if (!project.secties.length) {
+    project.secties.push({
+      titel: 'Inhoud',
+      niveau: 1,
+      blokken: [{ type: 'paragraph', tekst: project.subtitel || 'Geen inhoud gevonden.' }],
+    });
+  }
+
+  return project;
 }
 
-/* ────────────────────────────── docx maken ────────────────────────────── */
+/* ────────────────────────────── uitvoeren ─────────────────────────────── */
 
-const DOCUMENT = (inhoud) => `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
-<w:body>
-${inhoud}
-<w:sectPr><w:pgSz w:w="11906" w:h="16838"/><w:pgMar w:top="1418" w:right="1418" w:bottom="1418" w:left="1418"/></w:sectPr>
-</w:body>
-</w:document>`;
+if (process.argv[1] && path.resolve(process.argv[1]) === path.resolve(fileURLToPath(import.meta.url))) {
+  const argumenten = process.argv.slice(2);
+  const alles = argumenten.includes('--alles') || argumenten.length === 0;
 
-const STIJLEN = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<w:styles xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
-<w:docDefaults><w:rPrDefault><w:rPr>
-<w:rFonts w:ascii="Segoe UI" w:hAnsi="Segoe UI" w:cs="Segoe UI"/>
-<w:sz w:val="21"/><w:color w:val="1F2A24"/>
-</w:rPr></w:rPrDefault>
-<w:pPrDefault><w:pPr><w:spacing w:after="160" w:line="276" w:lineRule="auto"/></w:pPr></w:pPrDefault>
-</w:docDefaults>
+  const mappen = ['vault/Documentatie', 'vault/Portfolio'];
 
-<w:style w:type="paragraph" w:default="1" w:styleId="Normal"><w:name w:val="Normal"/></w:style>
+  const bestanden = alles
+    ? mappen.flatMap((map) =>
+        readdirSync(path.join(PROJECT, map))
+          .filter((naam) => naam.endsWith('.md'))
+          .map((naam) => path.join(map, naam)),
+      )
+    : argumenten.filter((argument) => !argument.startsWith('--'));
 
-<w:style w:type="paragraph" w:styleId="Titel"><w:name w:val="Title"/>
-<w:pPr><w:spacing w:before="0" w:after="240"/></w:pPr>
-<w:rPr><w:b/><w:sz w:val="52"/><w:color w:val="1F3D2B"/></w:rPr></w:style>
+  if (!bestanden.length) {
+    console.log('  Geen bestanden om te zetten.\n  Gebruik: node tools/md-naar-docx.mjs <bestand.md>');
+    process.exit(1);
+  }
 
-<w:style w:type="paragraph" w:styleId="Kop1"><w:name w:val="heading 1"/>
-<w:pPr><w:spacing w:before="360" w:after="120"/><w:keepNext/><w:outlineLvl w:val="0"/></w:pPr>
-<w:rPr><w:b/><w:sz w:val="32"/><w:color w:val="1F3D2B"/></w:rPr></w:style>
+  console.log('');
 
-<w:style w:type="paragraph" w:styleId="Kop2"><w:name w:val="heading 2"/>
-<w:pPr><w:spacing w:before="280" w:after="100"/><w:keepNext/><w:outlineLvl w:val="1"/></w:pPr>
-<w:rPr><w:b/><w:sz w:val="26"/><w:color w:val="2F5D45"/></w:rPr></w:style>
+  for (const bestand of bestanden) {
+    const bron = path.resolve(PROJECT, bestand);
+    if (!existsSync(bron)) continue;
 
-<w:style w:type="paragraph" w:styleId="Lijst"><w:name w:val="List Paragraph"/>
-<w:pPr><w:spacing w:after="80"/><w:ind w:left="360"/></w:pPr></w:style>
-</w:styles>`;
+    const doel = bron.replace(/\.md$/, '.docx');
+    const project = markdownNaarProject(readFileSync(bron, 'utf8'), { bestand });
 
-const NUMMERING = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<w:numbering xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
-<w:abstractNum w:abstractNumId="0">
-<w:lvl w:ilvl="0"><w:start w:val="1"/><w:numFmt w:val="bullet"/><w:lvlText w:val="•"/><w:lvlJc w:val="left"/>
-<w:pPr><w:ind w:left="360" w:hanging="220"/></w:pPr></w:lvl>
-</w:abstractNum>
-<w:num w:numId="1"><w:abstractNumId w:val="0"/></w:num>
-</w:numbering>`;
+    /*
+     * Een reflectie is kort genoeg om zonder inhoudsopgave te lezen; bij de
+     * documentatie helpt de inhoudsopgave juist.
+     */
+    const { buffer, statistiek } = bouwDocx(project, {
+      koptekst: project.titel,
+      voettekst: 'Dylan Schuurman',
+      inhoudsopgave: !/^reflectie/i.test(project.titel),
+    });
 
-const CONTENT_TYPES = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">
-<Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>
-<Default Extension="xml" ContentType="application/xml"/>
-<Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/>
-<Override PartName="/word/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.styles+xml"/>
-<Override PartName="/word/numbering.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.numbering+xml"/>
-</Types>`;
+    writeFileSync(doel, buffer);
+    console.log(
+      `  ${path.relative(PROJECT, doel).padEnd(56)} ${String(statistiek.secties).padStart(2)} secties, ` +
+        `${Math.round(buffer.length / 1024)} kB`,
+    );
+  }
 
-const RELS = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
-<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/>
-</Relationships>`;
-
-const DOC_RELS = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
-<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/>
-<Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/numbering" Target="numbering.xml"/>
-</Relationships>`;
-
-export function maakDocx(markdown) {
-  const inhoud = markdownNaarBlokken(markdown);
-
-  return zipBestanden([
-    { naam: '[Content_Types].xml', data: CONTENT_TYPES },
-    { naam: '_rels/.rels', data: RELS },
-    { naam: 'word/document.xml', data: DOCUMENT(inhoud) },
-    { naam: 'word/_rels/document.xml.rels', data: DOC_RELS },
-    { naam: 'word/styles.xml', data: STIJLEN },
-    { naam: 'word/numbering.xml', data: NUMMERING },
-  ]);
+  console.log('');
 }
 
-/* ─────────────────────────────── opdracht ─────────────────────────────── */
-
-/** Bestanden die standaard omgezet worden met --alles. */
-const STANDAARD = [
-  'vault/Documentatie/cavascp documentatie.md',
-  'vault/Documentatie/studio040 documentatie.md',
-  'vault/Portfolio/Reflectie semester.md',
-  'vault/Portfolio/Reflectie Studio040.md',
-];
-
-const argumenten = process.argv.slice(2);
-const alles = argumenten.includes('--alles') || argumenten.length === 0;
-const bestanden = alles
-  ? STANDAARD.filter((bestand) => {
-      try {
-        readFileSync(path.join(PROJECT, bestand));
-        return true;
-      } catch {
-        return false;
-      }
-    })
-  : argumenten.filter((argument) => !argument.startsWith('--'));
-
-if (!bestanden.length) {
-  console.log('  Geen bestanden om om te zetten.\n  Gebruik: node tools/md-naar-docx.mjs <bestand.md>');
-  process.exit(1);
-}
-
-for (const bestand of bestanden) {
-  const bron = path.resolve(PROJECT, bestand);
-  const doel = bron.replace(/\.md$/, '.docx');
-
-  const buffer = maakDocx(readFileSync(bron, 'utf8'));
-  writeFileSync(doel, buffer);
-
-  console.log(`  ${path.relative(PROJECT, doel)}  (${Math.round(buffer.length / 1024)} kB)`);
-}
-
-console.log('');
+export { markdownNaarProject };

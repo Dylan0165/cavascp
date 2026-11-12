@@ -46,9 +46,9 @@ terugkrijgen van iets dat de redactie echt kan gebruiken.
 
 **Mijn eigen project cavascp.** Een koppeling met Canvas die portfolio-
 deadlines en rubric-dekking laat zien, met een dashboard eromheen. Dat is
-entree het project waar ik het meest van heb geleerd over hoe je met een
+eerlijk gezegd het project waar ik het meest van heb geleerd over hoe je met een
 externe API omgaat: authenticatie, foutafhandeling, en wat je doet als een
-bron traag of stuk is. ⟦klopt deze formulering? pas aan waar nodig⟧
+bron traag of stuk is.
 
 ## Wat ik leerde over AI
 
@@ -113,8 +113,10 @@ Deze minor heeft me daar nieuwsgieriger in gemaakt, niet geruster.
 
 ### Derde review: december 2026
 
-⟦aanvullen: wat is er sinds de tweede review gedaan en geleerd?⟧
+Deze alinea wordt bijgewerkt zodra de derde review nadert: wat er sinds
+november is gedaan, wat er toen beter ging en wat er nog niet staat.
 
 ### Eindbeoordeling: januari 2027
 
-⟦aanvullen: het hele semester in vogelvlucht, met de stage als vooruitblik.⟧
+Deze alinea wordt bijgewerkt voor de eindbeoordeling: het hele semester in
+vogelvlucht, met de stage als vooruitblik.
