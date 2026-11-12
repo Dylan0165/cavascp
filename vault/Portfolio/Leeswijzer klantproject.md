@@ -51,8 +51,8 @@ generatietijd, en geen enkele sleutel in de frontend.
 
 ## Wat je hier kunt beoordelen
 
-- **Professional Standard**: de aanpak: hoe we van een vraag van de klant naar
-  een werkend product zijn gekomen, en hoe we verantwoording hebben afgelegd.
+- **Professional Standard**: de aanpak van klantvraag naar werkend product,
+  en hoe we verantwoording hebben afgelegd.
 - **Model Interaction & Adaptation**: hoe het model is ingezet, welke grenzen
   we hebben gesteld (lengte, bron, taal) en hoe we hebben gecontroleerd dat de
   uitvoer bruikbaar is.
