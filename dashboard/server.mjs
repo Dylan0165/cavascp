@@ -29,6 +29,7 @@ import { fetchPortfolioAssignments, buildCriterionCoverage } from '../mcp/lib/an
 import { parseTermCode, currentTermCode, groupBySemester } from '../mcp/lib/semesters.mjs';
 import { kravaStatus, kravaProjectenVanSchijf, kravaProjectVanSchijf, startKrava } from '../mcp/lib/krava.mjs';
 import { projectNaarDocx } from '../mcp/lib/assemble.mjs';
+import { zipMap } from './lib/zip-schrijf.mjs';
 import { checkDocument, naarPortflowGoalIds, semesterMappen } from '../mcp/lib/leeruitkomsten.mjs';
 import { createDocumentStore, parseMultipart } from './lib/documents.mjs';
 import * as werkplek from './lib/documenten.mjs';
@@ -1470,6 +1471,28 @@ const server = createServer(async (req, res) => {
       } catch (fout) {
         return sendJson(res, 502, { error: fout.message, overzicht: stageOverzicht() });
       }
+    }
+
+    /*
+     * De vault als zip. De map staat op deze machine; om hem in Obsidian te
+     * openen moet hij naar je eigen laptop. Eén bestand is de simpelste manier.
+     */
+    if (pathname === '/api/vault/zip' && req.method === 'GET') {
+      const vaultPad = path.resolve(inProject('vault'));
+
+      if (!existsSync(vaultPad)) {
+        return sendJson(res, 404, { error: 'De vault bestaat nog niet. Draai: node tools/vault.mjs' });
+      }
+
+      const zip = zipMap(vaultPad);
+      res.writeHead(200, {
+        ...security.headers(),
+        'Content-Type': 'application/zip',
+        'Content-Disposition': 'attachment; filename="cavascp-vault.zip"',
+        'Content-Length': zip.length,
+        'Cache-Control': 'no-store',
+      });
+      return res.end(zip);
     }
 
     if (pathname === '/api/stage/inbox' && req.method === 'POST') {

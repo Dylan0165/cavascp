@@ -72,3 +72,9 @@ data/stagebot/
 
 # Tijdelijk bestand voor een commit-boodschap.
 .git-commit-msg.txt
+
+# De Obsidian-vault: de notities horen erbij, de plugins niet — die zijn samen
+# 1,5 MB en haal je met `node tools/vault-plugins.mjs` opnieuw op.
+/vault/.obsidian/plugins/
+/vault/.obsidian/workspace*.json
+/vault/.obsidian/cache/

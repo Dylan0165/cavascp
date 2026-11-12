@@ -166,6 +166,7 @@ Controleer het zelf:
 ```bash
 cd dashboard
 node test-security.mjs   # 19 checks, waaronder cross-site en vreemde host
+node test-zip.mjs        # de vault-zip: schrijven en teruglezen (10 checks)
 ```
 
 Die test start zijn eigen server op poort 8799. Nodig, want het draaiende
