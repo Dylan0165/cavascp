@@ -1,0 +1,285 @@
+<!doctype html>
+<html lang="nl" data-theme="light">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Inleveren · Dylan Schuurman</title>
+<style>
+  :root {
+    --bg: #f7f6f2;
+    --pane: #fffefb;
+    --ink: #1c2420;
+    --ink-2: #47524b;
+    --ink-3: #7b857e;
+    --line: #e4e2d9;
+    --accent: #245c3f;
+    --accent-soft: #e6f0e8;
+    --gold: #b08a3e;
+    --radius: 16px;
+    --shadow: 0 1px 2px rgb(28 36 32 / .05), 0 10px 30px -18px rgb(28 36 32 / .25);
+  }
+  [data-theme="dark"] {
+    --bg: #141a17;
+    --pane: #1b231f;
+    --ink: #eef2ee;
+    --ink-2: #b6c0b8;
+    --ink-3: #7f8b83;
+    --line: #2c3630;
+    --accent: #8fd0a8;
+    --accent-soft: #20322a;
+    --gold: #d8b46a;
+    --shadow: 0 1px 2px rgb(0 0 0 / .3), 0 20px 50px -30px rgb(0 0 0 / .8);
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--ink);
+    font-family: "Segoe UI Variable Text", "Segoe UI", system-ui, sans-serif;
+    font-size: 15px; line-height: 1.55;
+  }
+  .balk {
+    display: flex; align-items: center; justify-content: space-between; gap: 1rem;
+    padding: .9rem clamp(1rem, 3vw, 2.5rem);
+    border-bottom: 1px solid var(--line);
+    background: color-mix(in srgb, var(--bg) 85%, transparent);
+    position: sticky; top: 0; backdrop-filter: blur(12px); z-index: 10;
+  }
+  .balk__naam { font-weight: 640; letter-spacing: -.01em; }
+  .balk__sub { color: var(--ink-3); font-size: 12.5px; }
+  main { max-width: 1040px; margin: 0 auto; padding: 0 clamp(1rem, 3vw, 2.5rem) 5rem; }
+  header.kop { padding: 3rem 0 2rem; border-bottom: 1px solid var(--line); margin-bottom: 2rem; }
+  .eyebrow { font-size: 11px; letter-spacing: .14em; text-transform: uppercase; color: var(--ink-3); font-weight: 600; margin: 0 0 .5rem; }
+  h1 { font-size: clamp(30px, 4vw, 44px); line-height: 1.05; letter-spacing: -.035em; margin: 0 0 .75rem; font-weight: 650; }
+  .kop p { margin: 0; color: var(--ink-2); max-width: 60ch; }
+  .kaart { background: var(--pane); border: 1px solid var(--line); border-radius: var(--radius); box-shadow: var(--shadow); margin-bottom: 1.5rem; overflow: hidden; }
+  .kaart__kop { display: flex; align-items: baseline; gap: .75rem; flex-wrap: wrap; padding: 1.1rem 1.4rem; border-bottom: 1px solid var(--line); }
+  .kaart__kop h2 { margin: 0; font-size: 17px; font-weight: 630; letter-spacing: -.01em; }
+  .kaart__waar { font-size: 12px; color: var(--ink-3); }
+  .blok { padding: 1.1rem 1.4rem; border-bottom: 1px solid var(--line); }
+  .blok:last-child { border-bottom: 0; }
+  .blok__rij { display: flex; justify-content: space-between; align-items: center; gap: 1rem; margin-bottom: .6rem; }
+  .blok__titel { margin: 0; font-size: 11px; letter-spacing: .1em; text-transform: uppercase; color: var(--ink-3); font-weight: 650; }
+  .tekst { white-space: pre-wrap; font-size: 14px; color: var(--ink-2); line-height: 1.6; max-height: 13rem; overflow: hidden; position: relative; }
+  .tekst.open { max-height: none; }
+  .tekst:not(.open)::after { content: ""; position: absolute; inset: auto 0 0 0; height: 3rem; background: linear-gradient(transparent, var(--pane)); }
+  .stuk { padding: .9rem 0; border-top: 1px solid var(--line); display: grid; grid-template-columns: minmax(0,1fr) auto; gap: .35rem .75rem; }
+  .stuk:first-of-type { border-top: 0; }
+  .stuk__naam { margin: 0; font-weight: 600; font-size: 14px; }
+  .stuk__wat { margin: .1rem 0 .4rem; font-size: 12px; color: var(--ink-3); }
+  .stuk__tekst { grid-column: 1 / -1; white-space: pre-wrap; font-size: 13.5px; color: var(--ink-2); line-height: 1.6; }
+  .acties { display: flex; gap: .4rem; flex-wrap: wrap; justify-content: flex-end; align-items: flex-start; }
+  button, .knop {
+    font: inherit; font-size: 12.5px; font-weight: 550; height: 30px; padding: 0 .7rem;
+    border-radius: 9px; border: 1px solid var(--line); background: var(--pane); color: var(--ink-2);
+    cursor: pointer; text-decoration: none; display: inline-flex; align-items: center; gap: .3rem;
+    transition: border-color .14s, color .14s, background .14s;
+  }
+  button:hover, .knop:hover { border-color: var(--accent); color: var(--accent); }
+  .knop--vol { background: var(--accent); border-color: var(--accent); color: #fff; }
+  [data-theme="dark"] .knop--vol { color: #0d1310; }
+  .knop--vol:hover { background: var(--accent); color: #fff; filter: brightness(1.06); }
+  .lo { display: inline-block; font-size: 10.5px; font-weight: 650; padding: 2px 8px; border-radius: 999px; background: var(--accent-soft); color: var(--accent); margin: 0 .25rem .25rem 0; }
+  .rij { display: flex; justify-content: space-between; align-items: center; gap: 1rem; padding: .8rem 1.4rem; border-bottom: 1px solid var(--line); }
+  .rij:last-child { border-bottom: 0; }
+  .rij__naam { margin: 0; font-size: 13.5px; font-weight: 560; }
+  .rij__wat { margin: .1rem 0 0; font-size: 12px; color: var(--ink-3); }
+  .meld {
+    position: fixed; left: 50%; bottom: 1.5rem; transform: translate(-50%, 1rem);
+    background: var(--ink); color: var(--bg); padding: .6rem 1.1rem; border-radius: 999px;
+    font-size: 13px; opacity: 0; transition: all .18s ease; pointer-events: none;
+  }
+  .meld.zichtbaar { opacity: 1; transform: translate(-50%, 0); }
+  .leeg { padding: 3rem 1rem; text-align: center; color: var(--ink-3); }
+</style>
+</head>
+<body>
+<div class="balk">
+  <div>
+    <div class="balk__naam">Inleveren</div>
+    <div class="balk__sub">alles voor Portflow op één pagina</div>
+  </div>
+  <button id="thema" type="button">Licht/donker</button>
+</div>
+
+<main>
+  <header class="kop">
+    <p class="eyebrow">V-OL-MAIFS · tweede review</p>
+    <h1>Alles klaar om in te leveren</h1>
+    <p>Per collectie de tekst voor <strong>Collection description</strong>, de bewijsstukken met hun <strong>Evidence description</strong>, en de documenten om te downloaden.</p>
+  </header>
+
+  <div id="lijst"><p class="leeg">Laden…</p></div>
+
+  <h2 style="font-size:15px;font-weight:640;margin:2rem 0 .8rem">Overige documenten</h2>
+  <div class="kaart" id="overig"></div>
+</main>
+
+<div class="meld" id="meld">Gekopieerd</div>
+
+<script type="module">
+const $ = (k, w = document) => w.querySelector(k);
+
+const maak = (tag, klasse, tekst) => {
+  const n = document.createElement(tag);
+  if (klasse) n.className = klasse;
+  if (tekst != null) n.textContent = tekst;
+  return n;
+};
+
+let timer = null;
+function meld(tekst) {
+  const vak = $('#meld');
+  vak.textContent = tekst;
+  vak.classList.add('zichtbaar');
+  clearTimeout(timer);
+  timer = setTimeout(() => vak.classList.remove('zichtbaar'), 1500);
+}
+
+async function kopieer(tekst) {
+  try {
+    await navigator.clipboard.writeText(tekst);
+    meld('Gekopieerd');
+  } catch {
+    const hulp = document.createElement('textarea');
+    hulp.value = tekst;
+    document.body.append(hulp);
+    hulp.select();
+    document.execCommand?.('copy');
+    hulp.remove();
+    meld('Gekopieerd');
+  }
+}
+
+const knop = (label, fn, vol = false) => {
+  const b = maak('button', vol ? 'knop knop--vol' : '', label);
+  b.type = 'button';
+  b.addEventListener('click', fn);
+  return b;
+};
+
+const download = (pad) => `/download?pad=${encodeURIComponent(pad)}`;
+
+const link = (label, pad) => {
+  const a = maak('a', 'knop', label);
+  a.href = download(pad);
+  return a;
+};
+
+function beschrijvingBlok(titel, tekst) {
+  const blok = maak('div', 'blok');
+  const rij = maak('div', 'blok__rij');
+  rij.append(maak('p', 'blok__titel', titel));
+
+  const acties = maak('div', 'acties');
+  acties.append(knop('Kopieer', () => kopieer(tekst), true));
+  const meer = knop('Alles tonen', () => {
+    vak.classList.toggle('open');
+    meer.textContent = vak.classList.contains('open') ? 'Inklappen' : 'Alles tonen';
+  });
+  acties.append(meer);
+  rij.append(acties);
+
+  const vak = maak('div', 'tekst', tekst);
+  blok.append(rij, vak);
+  return blok;
+}
+
+function stukRij(stuk) {
+  const rij = maak('div', 'stuk');
+
+  const links = maak('div');
+  links.append(maak('p', 'stuk__naam', stuk.titel));
+  if (stuk.wat) links.append(maak('p', 'stuk__wat', stuk.wat));
+
+  const acties = maak('div', 'acties');
+  acties.append(knop('Kopieer beschrijving', () => kopieer(stuk.beschrijving)));
+  if (stuk.bestand) acties.append(link(`Download${stuk.kb ? ` (${stuk.kb} kB)` : ''}`, stuk.bestand));
+
+  rij.append(links, acties);
+
+  if (stuk.leeruitkomst) {
+    const lo = maak('div');
+    for (const naam of stuk.leeruitkomst.split(',')) lo.append(maak('span', 'lo', naam.trim()));
+    rij.append(lo);
+  }
+
+  rij.append(maak('p', 'stuk__tekst', stuk.beschrijving));
+  return rij;
+}
+
+function collectieKaart(c) {
+  const kaart = maak('section', 'kaart');
+
+  const kop = maak('div', 'kaart__kop');
+  kop.append(maak('h2', null, c.naam), maak('span', 'kaart__waar', c.portflow));
+  kaart.append(kop);
+
+  if (c.tekst) kaart.append(beschrijvingBlok('Collection description', c.tekst));
+
+  const bewijs = maak('div', 'blok');
+  bewijs.append(maak('p', 'blok__titel', `Bewijsstukken (${c.bewijs.length})`));
+  for (const stuk of c.bewijs) bewijs.append(stukRij(stuk));
+  kaart.append(bewijs);
+
+  if (c.documenten?.length) {
+    const docs = maak('div', 'blok');
+    docs.append(maak('p', 'blok__titel', 'Documenten om te downloaden'));
+    for (const d of c.documenten) {
+      const rij = maak('div', 'stuk');
+      const links = maak('div');
+      links.append(maak('p', 'stuk__naam', d.titel));
+      if (d.wat) links.append(maak('p', 'stuk__wat', d.wat));
+      const acties = maak('div', 'acties');
+      if (d.docx) acties.append(link(`Word${d.kb ? ` (${d.kb} kB)` : ''}`, d.docx));
+      if (d.md) acties.append(link('Tekst', d.md));
+      rij.append(links, acties);
+      docs.append(rij);
+    }
+    kaart.append(docs);
+  }
+
+  if (c.leeswijzerKb) {
+    const rij = maak('div', 'rij');
+    const links = maak('div');
+    links.append(maak('p', 'rij__naam', 'Leeswijzer als Word-document'));
+    links.append(maak('p', 'rij__wat', 'Zelfde tekst als hierboven'));
+    const acties = maak('div', 'acties');
+    acties.append(link(`Download (${c.leeswijzerKb} kB)`, c.leeswijzerBestand));
+    rij.append(links, acties);
+    kaart.append(rij);
+  }
+
+  return kaart;
+}
+
+document.getElementById('thema').addEventListener('click', () => {
+  const nu = document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark';
+  document.documentElement.dataset.theme = nu;
+  localStorage.setItem('portfolio-thema', nu);
+});
+
+const bewaard = localStorage.getItem('portfolio-thema');
+if (bewaard) document.documentElement.dataset.theme = bewaard;
+
+const antwoord = await fetch('/api/lijst');
+const { collecties, overig } = await antwoord.json();
+
+const houder = $('#lijst');
+houder.textContent = '';
+for (const c of collecties) houder.append(collectieKaart(c));
+
+const overigHouder = $('#overig');
+overigHouder.textContent = '';
+for (const item of overig) {
+  const rij = maak('div', 'rij');
+  const links = maak('div');
+  links.append(maak('p', 'rij__naam', item.titel));
+  if (item.wat) links.append(maak('p', 'rij__wat', item.wat));
+  const acties = maak('div', 'acties');
+  if (item.kb) acties.append(link(`Download (${item.kb} kB)`, item.bestand));
+  else acties.append(maak('span', 'rij__wat', 'niet gevonden'));
+  rij.append(links, acties);
+  overigHouder.append(rij);
+}
+</script>
+</body>
+</html>

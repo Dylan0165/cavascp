@@ -144,3 +144,24 @@ En na het werk:
 ```bash
 git add -A && git commit -m "wat je deed" && git push
 ```
+
+## Inlever-dashboard (los)
+
+Naast het cavascp-dashboard draait er een tweede, veel kleiner scherm: de
+inleverpagina voor het portfolio. Bewust een eigen proces op een eigen poort,
+zodat een storing in het ene het andere niet meeneemt.
+
+| | |
+|---|---|
+| Adres | `http://dsh-harness.tail13dd48.ts.net:8792` |
+| Code | `portfolio-site/` |
+| Dienst | `systemctl --user status portfolio-site` |
+| Poort | 8792 (via `PORTFOLIO_POORT`) |
+| Login | geen; hij luistert alleen op het Tailscale-adres |
+
+Wat het toont: per Portflow-collectie de tekst voor *Collection description*,
+de bewijsstukken met hun *Evidence description* en leeruitkomst, en de
+downloads van de Word-bestanden en de presentatie.
+
+De inhoud komt uit `dashboard/lib/portfolio.mjs` en de teksten uit `vault/`.
+Eén bron, twee schermen.
