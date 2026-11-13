@@ -8,41 +8,18 @@ tags:
 
 # Leeswijzer: collectie orientatie
 
-> [!info] Waar dit hoort
-> Dit is de tekst voor het veld **Collection description** in Portflow.
-
-## Wat hier staat
-
 Deze collectie laat zien hoe ik me heb georiënteerd op AI als vakgebied: wat ik
-heb gebouwd, wat ik heb onderzocht en wat ik daarvan heb geleerd. Er staan vier
-bewijsstukken in, en ze horen bij elkaar.
+heb gebouwd, wat ik heb onderzocht en wat ik daarvan heb geleerd. De
+bewijsstukken horen bij elkaar en vertellen samen één verhaal.
 
-## In welke volgorde
+Lees ze in deze volgorde. Begin bij het product dat ik heb gemaakt, zodat je
+ziet wat ik kan bouwen. Lees daarna het onderzoek dat eronder ligt: welke
+bronnen, welke keuzes en hoe ik heb gemeten of het werkt. De toelichting over
+mijn AI-gebruik en de presentatie sluiten het af: die laten zien hoe ik het
+proces heb aangestuurd en hoe ik het aan een ander uitleg.
 
-1. **`Flascards.zip`**: de quiz-webapp. Begin hier: dit laat zien dat ik een
-   werkend product kan bouwen waarin een taalmodel een rol speelt. Let op de
-   opbouw van de vragen en de manier waarop de antwoorden worden gecontroleerd;
-   daar zit het denkwerk.
-2. **`RAG-verslag`**: het onderzoek. Dit is het verdiepende stuk: hoe haal je
-   bronnen op, hoe zorg je dat het antwoord daarop gebaseerd is, en hoe meet je
-   of dat lukt. Hier zit ook de ethische afweging over welke data je wel en
-   niet doorstuurt.
-3. **`Slides posterpresentatie`**: de presentatie die bij dit werk hoort.
+Bij elk bewijsstuk staat in de beschrijving wat het is en welke leeruitkomst het
+aantoont. Waar je op kunt letten: het verschil tussen wat ik zelf deed en wat
+het model deed, en de momenten waarop ik een uitkomst heb verworpen.
 
-De reflectie over het hele semester staat apart: [[Reflectie semester]].
-
-## Wat je hier kunt beoordelen
-
-- **Model Interaction & Adaptation**: hoe ik een model heb ingezet, getest en
-  bijgestuurd, en waar ik heb gemeten in plaats van gegokt.
-- **Data & Knowledge Stewardship**: de kwaliteit van de bronnen en wat ik heb
-  gedaan om die kwaliteit te bewaken.
-- **Responsible AI for Society**: de afwegingen over data, toestemming en de
-  gevolgen voor degene die het gebruikt.
-- **AI-Augmented Learning**: hoe ik AI heb gebruikt om te leren en te
-  bekritiseren, en waar ik zelf heb nagedacht.
-
-## Wat ik de volgende keer anders doe
-
-De vorige inlevering was een verzameling bestanden zonder uitleg. Daarom staat
-hier nu bij elk stuk waarom het er staat en wat het aantoont.
+De reflectie over het hele semester staat in de collectie Persoonlijk project.

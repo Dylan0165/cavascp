@@ -8,46 +8,17 @@ tags:
 
 # Leeswijzer: collectie Persoonlijk project
 
-> [!info] Waar dit hoort
-> Dit is de tekst voor het veld **Collection description** in Portflow.
+In deze collectie staat wat ik naast de minor heb gebouwd: cavascp, een
+koppeling met Canvas die bijhoudt welke portfolio-opdrachten open staan, welke
+criteria nog geen bewijs hebben en wat de deadlines zijn. Ik gebruik het elke
+week, en het zit op het snijvlak waar ik wil werken: systemen die met elkaar
+praten, met een model dat een deel van het werk doet en security die je vanaf
+het begin meebouwt.
 
-## Wat hier staat
+Begin bij de repository en de README: daar staat wat het doet en hoe je het
+start. Lees daarna de documentatie, met de keuzes en wat ze kostten, en tot slot
+de reflectie over het project en de reflectie over het hele semester.
 
-In deze collectie staat het project dat ik naast de minor heb gebouwd:
-**cavascp**. Dat is een koppeling met Canvas die bijhoudt welke
-portfolio-opdrachten er open staan, welke beoordelingscriteria nog geen bewijs
-hebben, en wat de deadlines zijn, met een dashboard eromheen dat ik zelf
-gebruik.
-
-Ik heb het project gekozen omdat ik het elke week nodig had. En omdat het
-precies op het snijvlak zit waar ik wil werken: systemen die met elkaar praten,
-met een taalmodel dat een deel van het werk doet, en security die je vanaf het
-begin meebouwt in plaats van erachteraan.
-
-## In welke volgorde
-
-1. **`cavascp` (repository)**: https://github.com/Dylan0165/cavascp.
-   Begin bij de README: daar staat wat het doet en hoe je het start.
-2. **`Dashboard`**: een schermafbeelding van het dashboard dat ik dagelijks
-   gebruik, met de tijdlijn en de criteria-dekking.
-
-## Wat je hier kunt beoordelen
-
-- **AI-Augmented Learning**: ik heb AI gebruikt om dit te bouwen, om te
-  ontwerpen, om fouten op te sporen en om keuzes te bekritiseren. In de
-  repository staat per onderdeel wat ik zelf deed en waar het model aan te pas
-  kwam, inclusief de momenten waarop ik het advies heb verworpen.
-- **Professional Standard**: werken met een externe API die niet van mij is,
-  zoals authenticatie, foutafhandeling en omgaan met een bron die traag of
-  stuk is.
-- **Personal Leadership**: ik heb dit project zelf bedacht, zelf afgebakend en
-  zelf doorgebouwd naast de minor. Dat is een keuze die iets over me zegt.
-- **Data & Knowledge Stewardship**: hoe ik met de opgehaalde Canvas-data
-  omga, wat ik bewaar, wat ik niet bewaar en waarom.
-
-## Eerlijk over AI
-
-Dit project is deels met AI gebouwd. Dat verberg ik niet: het staat in de
-repository, met commit-geschiedenis en een bestand waarin ik bijhoud wat ik
-zelf deed en wat ik heb overgenomen. Precies dat is denk ik het punt van
-AI-Augmented Learning.
+Waar je op kunt letten: dat ik hier zelf een grens heb getrokken en het project
+heb afgebakend, en dat ik kan aanwijzen waar ik het advies van het model heb
+verworpen. Dat laatste is precies wat AI-Augmented Learning van je vraagt.
