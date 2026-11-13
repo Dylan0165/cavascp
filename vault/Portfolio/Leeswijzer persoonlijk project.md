@@ -1,6 +1,6 @@
 ---
 collectie: Persoonlijk project
-bijgewerkt: 2026-11-12
+bijgewerkt: 2026-11-13
 tags:
   - portfolio
   - leeswijzer
@@ -8,17 +8,25 @@ tags:
 
 # Leeswijzer: collectie Persoonlijk project
 
-In deze collectie staat wat ik naast de minor heb gebouwd: cavascp, een
-koppeling met Canvas die bijhoudt welke portfolio-opdrachten open staan, welke
-criteria nog geen bewijs hebben en wat de deadlines zijn. Ik gebruik het elke
-week, en het zit op het snijvlak waar ik wil werken: systemen die met elkaar
-praten, met een model dat een deel van het werk doet en security die je vanaf
-het begin meebouwt.
+Deze collectie gaat over wat ik naast de minor bouwde: cavascp, een koppeling met
+Canvas die bijhoudt welke portfolio-opdrachten open staan, welke criteria nog
+geen bewijs hebben en wat de deadlines zijn. Ik gebruik het elke week, en het
+zit precies op het snijvlak waar ik wil werken: systemen die met elkaar praten,
+met een model dat een deel van het werk doet en security die je vanaf het begin
+meebouwt.
 
-Begin bij de repository en de README: daar staat wat het doet en hoe je het
-start. Lees daarna de documentatie, met de keuzes en wat ze kostten, en tot slot
-de reflectie over het project en de reflectie over het hele semester.
+Begin bij @CanvasMCP en Dashboard. Dat is het werkende systeem: een MCP-server
+die Canvas uitleest en een dashboard dat de uitkomst toont. Het laat zien dat ik
+een koppeling kan bouwen met een API die niet van mij is, met authenticatie,
+foutafhandeling en een bron die soms traag of stuk is. Dat hoort bij Professional
+Standard.
 
-Waar je op kunt letten: dat ik hier zelf een grens heb getrokken en het project
-heb afgebakend, en dat ik kan aanwijzen waar ik het advies van het model heb
-verworpen. Dat laatste is precies wat AI-Augmented Learning van je vraagt.
+@canvas mcp documentatie.docx is de verantwoording: welke keuzes ik maakte, wat
+ze kostten, waar het misgaat en wat ik de volgende keer anders zou doen. Daar
+staat ook de bronnenlijst bij. Dit hoort bij Professional Standard, en met de
+kritische sectie ook bij Personal Leadership.
+
+Waar je bij dit project op moet letten: ik heb het zelf bedacht en afgebakend, en
+ik heb een groot deel met AI gebouwd. In de documentatie staat per onderdeel waar
+het model aan te pas kwam en waar ik het advies heb verworpen. Dat is precies wat
+AI-Augmented Learning van je vraagt.
