@@ -78,3 +78,8 @@ data/stagebot/
 /vault/.obsidian/plugins/
 /vault/.obsidian/workspace*.json
 /vault/.obsidian/cache/
+
+# Word-documenten worden gegenereerd uit de markdown hierboven. Ze horen niet in
+# git: je opent ze lokaal, en anders maak je ze opnieuw met
+# `node tools/md-naar-docx.mjs --alles`.
+/vault/**/*.docx
