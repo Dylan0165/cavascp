@@ -23,7 +23,10 @@ export function leesNotitie(relatief) {
   tekst = tekst
     .replace(/^---\n[\s\S]*?\n---\n/, '')
     .replace(/^>\s*\[!info\][\s\S]*?(?=\n\n)/m, '')
-    .replace(/^#\s+.*\n/, '');
+    // Na de frontmatter staat vaak nog een lege regel; die moet eerst weg,
+    // anders blijft de titel bovenaan de Portflow-tekst staan.
+    .replace(/\s*$/, '')
+    .replace(/^\s*#\s+.*\n/, '');
 
   /*
    * Portflow is een tekstveld, geen markdown. Dus:
