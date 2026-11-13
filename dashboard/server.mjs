@@ -30,6 +30,7 @@ import { parseTermCode, currentTermCode, groupBySemester } from '../mcp/lib/seme
 import { kravaStatus, kravaProjectenVanSchijf, kravaProjectVanSchijf, startKrava } from '../mcp/lib/krava.mjs';
 import { projectNaarDocx } from '../mcp/lib/assemble.mjs';
 import { zipMap } from './lib/zip-schrijf.mjs';
+import { portfolioCatalogus } from './lib/portfolio.mjs';
 import { checkDocument, naarPortflowGoalIds, semesterMappen } from '../mcp/lib/leeruitkomsten.mjs';
 import { createDocumentStore, parseMultipart } from './lib/documents.mjs';
 import * as werkplek from './lib/documenten.mjs';
@@ -1471,6 +1472,18 @@ const server = createServer(async (req, res) => {
       } catch (fout) {
         return sendJson(res, 502, { error: fout.message, overzicht: stageOverzicht() });
       }
+    }
+
+    /*
+     * De inleverpagina: één scherm met per collectie de description, de
+     * bewijsstukken en de downloads.
+     */
+    if (pathname === '/portfolio' && req.method === 'GET') {
+      return serveBeveiligd(req, res, 'portfolio.html');
+    }
+
+    if (pathname === '/api/portfolio' && req.method === 'GET') {
+      return sendJson(res, 200, portfolioCatalogus());
     }
 
     /*
